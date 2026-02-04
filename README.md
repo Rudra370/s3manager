@@ -19,15 +19,33 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="screenshots/img1.png" alt="img1" width="90%">
+  <img src="screenshots/1. bucket list.png" alt="img1" width="90%">
+  </br>
+  <small>Bucket list</small>
 </p>
 
 <p align="center">
-  <img src="screenshots/img2.png" alt="img2" width="90%">
+  <img src="screenshots/2. bucket view.png" alt="img2" width="90%">
+  </br>
+  <small>Bucket view</small>
 </p>
 
 <p align="center">
-  <img src="screenshots/img3.png" alt="img3" width="90%">
+  <img src="screenshots/3. manage team.png" alt="img3" width="90%">
+  </br>
+  <small>Manage team</small>
+</p>
+
+<p align="center">
+  <img src="screenshots/4. share file with password.png" alt="img4" width="90%">
+  </br>
+  <small>Share file with/without password</small>
+</p>
+
+<p align="center">
+  <img src="screenshots/5. manage multiple storages.png" alt="img5" width="90%">
+  </br>
+  <small>Manage multiple S3-compatible storages</small>
 </p>
 
 ---
@@ -35,13 +53,16 @@
 ## ✨ Features
 
 - **📁 Easy File Management** — Upload, organize, and manage your files with a familiar folder interface
+- **👥 Multi-User Ready** — Share access with your team
+- **🗄 Multi-Storage Support** — Connect multiple S3-compatible storage accounts
+- **🔗 Shared Links** - Create and manage shareable links for your files (with/without password)
+- **🏷️ Your Brand** - Customize the interface with your logo and Brand name
 - **⚡ Quick Uploads** — Upload single or multiple files in seconds
 - **🖼️ Built-in Previews** — View images and text files without downloading
-- **🌙 Dark Mode** — Easy on the eyes, day or night
-- **👥 Multi-User Ready** — Share access with your team
+- **🌙 Dark Mode** — Easy on the eyes, day or night. Also supports light mode
 - **🔍 Lightning Fast Search** — Find files instantly across buckets
 - **📊 Size Insights** — Know exactly how much space you're using
-- **🔒 Secure by Default** — Your credentials stay on your server
+- **🔒 Secure by Default** — Your credentials stay on your server encrypted
 
 **Works with:** AWS S3 · MinIO · Wasabi · Hetzner · Any S3-compatible storage
 
