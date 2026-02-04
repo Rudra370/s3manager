@@ -1,0 +1,11 @@
+# E2E Test Dependencies
+# Install with: pip3 install -r requirements.txt
+
+# Browser automation
+playwright>=1.40.0
+
+# Environment variable loading
+python-dotenv>=1.0.0
+
+# HTTP requests for API calls (cleanup, verification)
+requests>=2.31.0
