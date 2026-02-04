@@ -8,7 +8,7 @@
 
 ## 🎥 Demo Video
 
-<iframe width="560" height="315" src="https://www.youtube.com/watch?v=-VyihmHZmew" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+https://github.com/user-attachments/assets/d6869075-2456-4e32-981b-df77ef6e345d
 
 ---
 
