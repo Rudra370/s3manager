@@ -8,11 +8,7 @@
 
 ## 🎥 Demo Video
 
-<p align="center">
-  <video src="demo/demo.mp4" controls width="90%">
-    Your browser does not support the video tag.
-  </video>
-</p>
+<iframe width="560" height="315" src="https://www.youtube.com/watch?v=-VyihmHZmew" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ---
 
