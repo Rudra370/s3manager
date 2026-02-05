@@ -64,3 +64,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Agent files (local only)
+AGENTS.md
+RELEASE_NOTE.md

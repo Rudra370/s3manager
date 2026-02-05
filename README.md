@@ -6,65 +6,67 @@
 
 ---
 
-## 🎥 Demo Video
+## Demo Video
 
 https://github.com/user-attachments/assets/d6869075-2456-4e32-981b-df77ef6e345d
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <p align="center">
-  <img src="screenshots/1. bucket list.png" alt="img1" width="90%">
-  </br>
+  <img src="screenshots/1. bucket list.png" alt="Bucket list" width="90%">
+  <br>
   <small>Bucket list</small>
 </p>
 
 <p align="center">
-  <img src="screenshots/2. bucket view.png" alt="img2" width="90%">
-  </br>
+  <img src="screenshots/2. bucket view.png" alt="Bucket view" width="90%">
+  <br>
   <small>Bucket view</small>
 </p>
 
 <p align="center">
-  <img src="screenshots/3. manage team.png" alt="img3" width="90%">
-  </br>
+  <img src="screenshots/3. manage team.png" alt="Manage team" width="90%">
+  <br>
   <small>Manage team</small>
 </p>
 
 <p align="center">
-  <img src="screenshots/4. share file with password.png" alt="img4" width="90%">
-  </br>
+  <img src="screenshots/4. share file with password.png" alt="Share file" width="90%">
+  <br>
   <small>Share file with/without password</small>
 </p>
 
 <p align="center">
-  <img src="screenshots/5. manage multiple storages.png" alt="img5" width="90%">
-  </br>
+  <img src="screenshots/5. manage multiple storages.png" alt="Multiple storages" width="90%">
+  <br>
   <small>Manage multiple S3-compatible storages</small>
 </p>
 
 ---
 
-## ✨ Features
+## Features
 
-- **📁 Easy File Management** — Upload, organize, and manage your files with a familiar folder interface
-- **👥 Multi-User Ready** — Share access with your team
-- **🗄 Multi-Storage Support** — Connect multiple S3-compatible storage accounts
-- **🔗 Shared Links** - Create and manage shareable links for your files (with/without password)
-- **🏷️ Your Brand** - Customize the interface with your logo and Brand name
-- **⚡ Quick Uploads** — Upload single or multiple files in seconds
-- **🖼️ Built-in Previews** — View images and text files without downloading
-- **🌙 Dark Mode** — Easy on the eyes, day or night. Also supports light mode
-- **🔍 Lightning Fast Search** — Find files instantly across buckets
-- **📊 Size Insights** — Know exactly how much space you're using
-- **🔒 Secure by Default** — Your credentials stay on your server encrypted
+| Feature | Description |
+|---------|-------------|
+| **File Management** | Upload, organize, and manage files with a familiar folder interface |
+| **Multi-User** | Share access with your team |
+| **Multi-Storage** | Connect multiple S3-compatible storage accounts |
+| **Shared Links** | Create shareable links for files (with/without password) |
+| **Branding** | Customize with your logo and brand name |
+| **Quick Uploads** | Upload single or multiple files in seconds |
+| **File Previews** | View images and text files without downloading |
+| **Dark/Light Mode** | Choose your preferred theme |
+| **Search** | Find files instantly across buckets |
+| **Size Insights** | Know exactly how much space you're using |
+| **Secure** | Credentials stay on your server encrypted |
 
 **Works with:** AWS S3 · MinIO · Wasabi · Hetzner · Any S3-compatible storage
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -91,7 +93,7 @@ Then open **http://localhost:3012** and complete the setup wizard.
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Create a `.env` file (optional):
 
@@ -107,7 +109,7 @@ cp .env.example .env
 
 ---
 
-## 🛠️ Updating
+## Updating
 
 ```bash
 ./deploy.sh
@@ -115,7 +117,7 @@ cp .env.example .env
 
 ---
 
-## 🧪 Development & Testing
+## Development & Testing
 
 Want to contribute or run E2E tests?
 
@@ -131,23 +133,22 @@ See [e2e/README.md](e2e/README.md) for detailed test configuration.
 
 ---
 
-## 📄 License
+## License
 
-MIT License — do whatever you want, just don't blame me! 😊
+MIT License — do whatever you want, just don't blame me!
 
 ---
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
-Built with ❤️ using:
+Built with:
 - [FastAPI](https://fastapi.tiangolo.com/) — The Python framework
 - [React](https://react.dev/) — The UI library
 - [Material-UI](https://mui.com/) — The component library
 
 ---
 
-## 💬 Support
+## Support
 
-- 🐛 [Report a bug](../../issues)
-- 💡 [Request a feature](../../discussions)
-
+- [Report a bug](../../issues)
+- [Request a feature](../../discussions)
