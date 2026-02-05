@@ -68,3 +68,6 @@ logs/
 # Agent files (local only)
 AGENTS.md
 RELEASE_NOTE.md
+
+# E2E test result files
+e2e/test*
