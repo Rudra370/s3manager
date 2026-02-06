@@ -10,8 +10,9 @@ from alembic import context
 # Add the parent directory to sys.path so we can import app modules
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+# Import config first to ensure env is loaded
+from app.config import DATABASE_URL
 from app.models import Base
-from app.database import SQLALCHEMY_DATABASE_URL
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -26,9 +27,8 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-# Get database URL from environment or use the one from database module
-database_url = os.getenv("DATABASE_URL", SQLALCHEMY_DATABASE_URL)
-config.set_main_option("sqlalchemy.url", database_url)
+# Set database URL from config module
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 
 def run_migrations_offline() -> None:
