@@ -89,6 +89,12 @@ test: ## Run full E2E test suite
 	@echo "$(BLUE)Running E2E tests...$(NC)"
 	cd e2e && python3 test_runner.py
 
+.PHONY: test-fast
+test-fast: ## Run E2E tests with fast reset (truncate instead of recreate)
+	@echo "$(BLUE)Running E2E tests (fast mode)...$(NC)"
+	@echo "$(YELLOW)Note: Falls back to full reset if services not running$(NC)"
+	cd e2e && python3 test_runner.py --fast
+
 .PHONY: test-smoke
 test-smoke: ## Run a quick smoke test (basic health check)
 	@echo "$(BLUE)Running smoke tests...$(NC)"
@@ -97,11 +103,6 @@ test-smoke: ## Run a quick smoke test (basic health check)
 	@echo "  - Checking frontend..."
 	@curl -sf http://localhost:$(PORT) >/dev/null && echo "$(GREEN)  ✓ Frontend is serving$(NC)" || (echo "$(RED)  ✗ Frontend is not responding$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Smoke tests passed$(NC)"
-
-.PHONY: test-quick
-test-quick: ## Run E2E tests without full Docker reset (faster)
-	@echo "$(YELLOW)Note: test-quick not yet implemented - running full test suite$(NC)"
-	cd e2e && python3 test_runner.py
 
 # =============================================================================
 # Database Commands

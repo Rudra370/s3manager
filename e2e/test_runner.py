@@ -24,6 +24,7 @@ import os
 import time
 import json
 import re
+import argparse
 from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple, Optional
@@ -85,7 +86,8 @@ def log_step(step_num: int, total: int, msg: str):
 class S3ManagerE2ETests:
     """End-to-end test orchestrator for S3 Manager"""
     
-    def __init__(self):
+    def __init__(self, fast_mode: bool = False):
+        self.fast_mode = fast_mode
         self.test_results: List[Tuple[str, str, Optional[str]]] = []
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
@@ -140,9 +142,103 @@ class S3ManagerE2ETests:
     # Infrastructure Management
     # ==================================================================
     
+    def _services_are_running(self) -> bool:
+        """Check if required services are already running and healthy."""
+        try:
+            import urllib.request
+            # Quick check if API is responding
+            urllib.request.urlopen(
+                f'{self.base_url}/api/health',
+                timeout=2
+            )
+            return True
+        except Exception:
+            return False
+    
+    def _fast_reset_database(self) -> bool:
+        """Fast reset: truncate all tables instead of recreating database.
+        
+        Returns True if successful, False if full reset needed.
+        """
+        log_step(1, 3, "Fast Reset (Truncating Tables)")
+        log_info("Checking if services are running...")
+        
+        if not self._services_are_running():
+            log_warning("Services not running, falling back to full reset")
+            return False
+        
+        log_success("Services are running")
+        log_info("Truncating all tables...")
+        
+        # Get list of tables to truncate
+        truncate_sql = """
+        DO $$
+        DECLARE
+            r RECORD;
+        BEGIN
+            FOR r IN (
+                SELECT tablename 
+                FROM pg_tables 
+                WHERE schemaname = 'public' 
+                AND tablename NOT LIKE 'alembic_%'
+            ) LOOP
+                EXECUTE 'TRUNCATE TABLE "' || r.tablename || '" CASCADE';
+            END LOOP;
+        END $$;
+        """
+        
+        try:
+            # Execute truncate via docker exec
+            result = subprocess.run(
+                [
+                    'docker', 'exec', '-i',
+                    '-e', f'PGPASSWORD={db_manager.password}',
+                    db_manager.container,
+                    'psql',
+                    '-U', db_manager.user,
+                    '-d', db_manager.db,
+                    '-c', truncate_sql
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                log_warning(f"Truncate failed: {result.stderr}")
+                return False
+            
+            log_success("All tables truncated")
+            
+            # Run migrations to ensure schema is up to date
+            log_info("Running migrations...")
+            migrate_result = subprocess.run(
+                ['docker', 'exec', 's3manager', 
+                 'alembic', 'upgrade', 'head'],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if migrate_result.returncode != 0:
+                log_warning(f"Migration warning: {migrate_result.stderr}")
+            
+            log_success("Fast reset complete")
+            return True
+            
+        except Exception as e:
+            log_warning(f"Fast reset failed: {e}")
+            return False
+    
     def reset_environment(self) -> None:
         """Stop services, create fresh test database, restart services"""
-        log_step(1, 3, "Resetting Environment")
+        # Try fast reset first if in fast mode
+        if self.fast_mode:
+            if self._fast_reset_database():
+                return
+            log_info("Falling back to full reset...")
+        
+        log_step(1, 3, "Resetting Environment (Full)")
         
         # Stop docker-compose services first
         log_info("Stopping Docker services...")
@@ -1958,13 +2054,15 @@ class S3ManagerE2ETests:
         """Main entry point - runs full test suite"""
         print(f"\n{Colors.BOLD}{'='*70}")
         print("S3 MANAGER - END-TO-END TEST SUITE")
+        if self.fast_mode:
+            print(f"{Colors.YELLOW}FAST MODE ENABLED{Colors.END}")
         print(f"{'='*70}{Colors.END}\n")
         
         start_time = time.time()
         exit_code = 0
         
         try:
-            # Phase 1: Reset environment
+            # Phase 1: Reset environment (fast or full)
             self.reset_environment()
             
             # Phase 2: Start browser and run tests
@@ -1998,7 +2096,27 @@ class S3ManagerE2ETests:
 
 
 def main():
-    """Entry point"""
+    """Entry point with argument parsing"""
+    parser = argparse.ArgumentParser(
+        description='S3 Manager E2E Test Runner',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python3 test_runner.py              # Full reset (slow but reliable)
+  python3 test_runner.py --fast       # Fast mode (truncate tables)
+  python3 test_runner.py -f           # Short form for fast mode
+
+Fast mode will automatically fall back to full reset if services are not running.
+        """
+    )
+    parser.add_argument(
+        '-f', '--fast',
+        action='store_true',
+        help='Enable fast mode: truncate tables instead of recreating database'
+    )
+    
+    args = parser.parse_args()
+    
     # Check if .env file exists
     base_env = Path(__file__).parent.parent / '.env'
     if not base_env.exists():
@@ -2020,7 +2138,7 @@ def main():
         sys.exit(1)
     
     # Run tests
-    runner = S3ManagerE2ETests()
+    runner = S3ManagerE2ETests(fast_mode=args.fast)
     exit_code = runner.run()
     sys.exit(exit_code)
 
