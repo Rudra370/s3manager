@@ -74,5 +74,8 @@ logs/
 AGENTS.md
 RELEASE_NOTE.md
 
+# Task tracker (personal)
+.tasks.md
+
 # E2E test result files
 e2e/test*
