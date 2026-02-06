@@ -4,7 +4,7 @@ Backend: FastAPI
 """
 
 # Load environment configuration FIRST (before any other imports)
-from app.config import ENV, DEBUG, PORT, SECRET_KEY, ALLOWED_ORIGINS
+from app.config import ENV, DEBUG, PORT, SECRET_KEY, ALLOWED_ORIGINS, DATABASE_URL
 
 import os
 import re
@@ -108,6 +108,36 @@ app.include_router(tasks.router)
 def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# Debug info endpoint (only available in DEBUG mode)
+if DEBUG:
+    @app.get("/api/debug/info")
+    def debug_info():
+        """Debug information endpoint - only available in DEBUG mode."""
+        import sys
+        return {
+            "environment": ENV,
+            "debug": DEBUG,
+            "python_version": sys.version,
+            "platform": sys.platform,
+            "database_url": DATABASE_URL.replace(
+            "://", "://***@").replace("//", "//***@"),  # Mask credentials
+            "allowed_origins": ALLOWED_ORIGINS,
+        }
+    
+    @app.get("/api/debug/routes")
+    def debug_routes():
+        """List all registered routes - only available in DEBUG mode."""
+        routes = []
+        for route in app.routes:
+            if hasattr(route, "methods") and hasattr(route, "path"):
+                routes.append({
+                    "path": route.path,
+                    "methods": list(route.methods),
+                    "name": route.name
+                })
+        return {"routes": sorted(routes, key=lambda x: x["path"])}
 
 
 # Global exception handler for 500 errors - returns full traceback
