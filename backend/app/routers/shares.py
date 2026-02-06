@@ -3,7 +3,7 @@ Shared Links Router - Shareable URLs for objects
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -56,10 +56,10 @@ def create_share(
             detail="Password must be at least 4 characters"
         )
     
-    # Calculate expiration
+    # Calculate expiration (using timezone-aware UTC)
     expires_at = None
     if data.expires_in_hours:
-        expires_at = datetime.utcnow() + timedelta(hours=data.expires_in_hours)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=data.expires_in_hours)
     
     # Create share
     share = SharedLink(
@@ -96,7 +96,7 @@ def create_share(
         "max_downloads": share.max_downloads,
         "download_count": share.download_count,
         "is_active": share.is_active,
-        "is_expired": share.expires_at and share.expires_at < datetime.utcnow(),
+        "is_expired": share.expires_at and share.expires_at < datetime.now(timezone.utc),
         "is_password_protected": share.password_hash is not None,
         "created_at": share.created_at
     }
@@ -125,7 +125,7 @@ def list_shares(
     
     shares = []
     for share, creator_name in results:
-        is_expired = share.expires_at and share.expires_at < datetime.utcnow()
+        is_expired = share.expires_at and share.expires_at < datetime.now(timezone.utc)
         shares.append({
             "id": share.id,
             "share_token": share.share_token,
@@ -169,7 +169,7 @@ def get_share_info(
         )
     
     # Check if expired
-    if share.expires_at and share.expires_at < datetime.utcnow():
+    if share.expires_at and share.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="This share link has expired"
@@ -212,7 +212,7 @@ def get_share_info(
         "is_password_protected": share.password_hash is not None,
         "requires_password": share.password_hash is not None,
         "expires_at": share.expires_at,
-        "is_expired": share.expires_at and share.expires_at < datetime.utcnow()
+        "is_expired": share.expires_at and share.expires_at < datetime.now(timezone.utc)
     }
 
 
@@ -238,7 +238,7 @@ def access_share(
         )
     
     # Check if expired
-    if share.expires_at and share.expires_at < datetime.utcnow():
+    if share.expires_at and share.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="This share link has expired"
@@ -281,7 +281,7 @@ def download_shared_file(
         )
     
     # Check if expired
-    if share.expires_at and share.expires_at < datetime.utcnow():
+    if share.expires_at and share.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="This share link has expired"
@@ -338,7 +338,7 @@ def download_shared_file(
     
     # Increment download count
     share.download_count += 1
-    share.last_accessed_at = datetime.utcnow()
+    share.last_accessed_at = datetime.now(timezone.utc)
     
     # Auto-delete if max downloads reached
     if share.max_downloads and share.download_count >= share.max_downloads:

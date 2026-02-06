@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: s3manager-postgres
+    environment:
+      POSTGRES_USER: s3manager
+      POSTGRES_PASSWORD: s3manager
+      POSTGRES_DB: s3manager
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    # Port not exposed for security - use docker exec for DB operations if needed
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s3manager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: s3manager-redis
@@ -18,15 +36,18 @@ services:
       - "127.0.0.1:${PORT:-3012}:8000"
     environment:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - DATABASE_URL=sqlite:///data/s3manager.db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://s3manager:s3manager@postgres:5432/s3manager}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - ./data:/app/data
       - ./backend/app/static:/app/app/static:ro
+      - ./backend/alembic:/app/alembic:ro
+      - ./backend/alembic.ini:/app/alembic.ini:ro
     restart: unless-stopped
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -34,7 +55,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
   celery:
     build: ./backend
@@ -42,15 +63,21 @@ services:
     command: celery -A app.celery_app worker -B --loglevel=info
     environment:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - DATABASE_URL=sqlite:///data/s3manager.db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://s3manager:s3manager@postgres:5432/s3manager}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - ./data:/app/data
+      - ./backend/alembic:/app/alembic:ro
+      - ./backend/alembic.ini:/app/alembic.ini:ro
     restart: unless-stopped
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       s3manager:
         condition: service_healthy
+
+volumes:
+  postgres_data:

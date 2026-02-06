@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SnackbarProvider } from './contexts/SnackbarContext';
 import { AppConfigProvider } from './contexts/AppConfigContext';
 import { StorageConfigProvider } from './contexts/StorageConfigContext';
+import { ErrorProvider } from './contexts/ErrorContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
@@ -131,17 +132,19 @@ function App() {
 
   return (
     <SnackbarProvider>
-      <AuthProvider setupComplete={setupComplete}>
-        <StorageConfigProvider>
-          <AppConfigProvider initialConfig={initialAppConfig}>
-            <AppRoutes 
-              setupComplete={setupComplete} 
-              onSetupComplete={handleSetupComplete} 
-              initialAppConfig={initialAppConfig}
-            />
-          </AppConfigProvider>
-        </StorageConfigProvider>
-      </AuthProvider>
+      <ErrorProvider>
+        <AuthProvider setupComplete={setupComplete}>
+          <StorageConfigProvider>
+            <AppConfigProvider initialConfig={initialAppConfig}>
+              <AppRoutes 
+                setupComplete={setupComplete} 
+                onSetupComplete={handleSetupComplete} 
+                initialAppConfig={initialAppConfig}
+              />
+            </AppConfigProvider>
+          </StorageConfigProvider>
+        </AuthProvider>
+      </ErrorProvider>
     </SnackbarProvider>
   );
 }

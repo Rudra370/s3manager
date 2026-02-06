@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Enum, Index
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects import postgresql
 from app.database import Base
 import enum
 
@@ -34,7 +35,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_admin = Column(Boolean, default=False)
-    role = Column(Enum(UserRole), default=UserRole.READ_ONLY)
+    role = Column(postgresql.ENUM('admin', 'read-write', 'read-only', name='userrole', create_type=False), default='read-only')
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -85,7 +86,7 @@ class UserStoragePermission(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     storage_config_id = Column(Integer, ForeignKey("storage_configs.id", ondelete="CASCADE"), nullable=False)
-    permission = Column(Enum(StoragePermission), nullable=False, default=StoragePermission.NONE)
+    permission = Column(postgresql.ENUM('none', 'read', 'read-write', name='storagepermission', create_type=False), nullable=False, default='none')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -116,7 +117,7 @@ class UserBucketPermission(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     storage_config_id = Column(Integer, ForeignKey("storage_configs.id", ondelete="CASCADE"), nullable=False)
     bucket_name = Column(String, nullable=False)
-    permission = Column(Enum(BucketPermission), nullable=False, default=BucketPermission.READ)
+    permission = Column(postgresql.ENUM('none', 'read', 'read-write', name='bucketpermission', create_type=False), nullable=False, default='read')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

@@ -81,7 +81,8 @@ def setup_application(response: Response, setup_data: SetupRequest, db: Session 
             name=setup_data.name,
             email=setup_data.email,
             hashed_password=hashed_password,
-            is_admin=True
+            is_admin=True,
+            role='admin'
         )
         db.add(admin_user)
         

@@ -71,7 +71,7 @@ def list_users(
                     "user_id": p.UserStoragePermission.user_id,
                     "storage_config_id": p.UserStoragePermission.storage_config_id,
                     "storage_config_name": p.config_name,
-                    "permission": p.UserStoragePermission.permission.value,
+                    "permission": p.UserStoragePermission.permission.value if hasattr(p.UserStoragePermission.permission, 'value') else p.UserStoragePermission.permission,
                     "created_at": p.UserStoragePermission.created_at,
                     "updated_at": p.UserStoragePermission.updated_at
                 }
@@ -84,7 +84,7 @@ def list_users(
                     "storage_config_id": p.UserBucketPermission.storage_config_id,
                     "storage_config_name": p.config_name,
                     "bucket_name": p.UserBucketPermission.bucket_name,
-                    "permission": p.UserBucketPermission.permission.value,
+                    "permission": p.UserBucketPermission.permission.value if hasattr(p.UserBucketPermission.permission, 'value') else p.UserBucketPermission.permission,
                     "created_at": p.UserBucketPermission.created_at,
                     "updated_at": p.UserBucketPermission.updated_at
                 }
@@ -117,7 +117,8 @@ def create_user(
         email=user_data.email,
         hashed_password=hashed_password,
         is_admin=user_data.is_admin,
-        is_active=True
+        is_active=True,
+        role='admin' if user_data.is_admin else 'read-only'
     )
     db.add(new_user)
     db.flush()  # Get the user ID
@@ -235,7 +236,7 @@ def update_user(
             storage_perm = UserStoragePermission(
                 user_id=user.id,
                 storage_config_id=perm_data.storage_config_id,
-                permission=perm_data.permission
+                permission=perm_data.permission.value
             )
             db.add(storage_perm)
     
@@ -252,7 +253,7 @@ def update_user(
                 user_id=user.id,
                 storage_config_id=perm_data.storage_config_id,
                 bucket_name=perm_data.bucket_name,
-                permission=perm_data.permission
+                permission=perm_data.permission.value
             )
             db.add(bucket_perm)
     
@@ -360,7 +361,7 @@ def get_user_storage_permissions(
             "user_id": p.UserStoragePermission.user_id,
             "storage_config_id": p.UserStoragePermission.storage_config_id,
             "storage_config_name": p.config_name,
-            "permission": p.UserStoragePermission.permission.value,
+            "permission": p.UserStoragePermission.permission.value if hasattr(p.UserStoragePermission.permission, 'value') else p.UserStoragePermission.permission,
             "created_at": p.UserStoragePermission.created_at,
             "updated_at": p.UserStoragePermission.updated_at
         }
@@ -510,7 +511,7 @@ def get_user_bucket_permissions(
             "storage_config_id": p.UserBucketPermission.storage_config_id,
             "storage_config_name": p.config_name,
             "bucket_name": p.UserBucketPermission.bucket_name,
-            "permission": p.UserBucketPermission.permission.value,
+            "permission": p.UserBucketPermission.permission.value if hasattr(p.UserBucketPermission.permission, 'value') else p.UserBucketPermission.permission,
             "created_at": p.UserBucketPermission.created_at,
             "updated_at": p.UserBucketPermission.updated_at
         }
@@ -664,7 +665,7 @@ def _build_user_response(user: User, db: Session) -> dict:
                 "user_id": p.UserStoragePermission.user_id,
                 "storage_config_id": p.UserStoragePermission.storage_config_id,
                 "storage_config_name": p.config_name,
-                "permission": p.UserStoragePermission.permission.value,
+                "permission": p.UserStoragePermission.permission.value if hasattr(p.UserStoragePermission.permission, 'value') else p.UserStoragePermission.permission,
                 "created_at": p.UserStoragePermission.created_at,
                 "updated_at": p.UserStoragePermission.updated_at
             }
@@ -677,7 +678,7 @@ def _build_user_response(user: User, db: Session) -> dict:
                 "storage_config_id": p.UserBucketPermission.storage_config_id,
                 "storage_config_name": p.config_name,
                 "bucket_name": p.UserBucketPermission.bucket_name,
-                "permission": p.UserBucketPermission.permission.value,
+                "permission": p.UserBucketPermission.permission.value if hasattr(p.UserBucketPermission.permission, 'value') else p.UserBucketPermission.permission,
                 "created_at": p.UserBucketPermission.created_at,
                 "updated_at": p.UserBucketPermission.updated_at
             }

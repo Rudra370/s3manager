@@ -89,6 +89,13 @@ const ShareDialog = ({ open, onClose, bucketName, objectKey, objectName }) => {
       setCreatedShare(response.data);
       showSnackbar('Share link created successfully', 'success');
     } catch (error) {
+      // Check if this is a 500 error with traceback - global handler will show modal
+      if (error.response?.status === 500 && error.response?.data?.traceback) {
+        // Don't show snackbar - the global error modal will be shown
+        // Just stop loading and let the error bubble up
+        setLoading(false);
+        return;
+      }
       showSnackbar(error.response?.data?.detail || 'Failed to create share link', 'error');
     } finally {
       setLoading(false);

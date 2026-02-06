@@ -10,10 +10,30 @@ const api = axios.create({
   withCredentials: true, // Enable sending cookies with requests
 });
 
+// Global error handler for 500 errors with traceback
+let globalErrorHandler = null;
+
+/**
+ * Set the global error handler function for 500 errors
+ * This is called by ErrorProvider to set the handler
+ * @param {Function} handler - Function to call when 500 with traceback occurs
+ */
+export const setGlobalErrorHandler = (handler) => {
+  globalErrorHandler = handler;
+};
+
+/**
+ * Clear the global error handler
+ */
+export const clearGlobalErrorHandler = () => {
+  globalErrorHandler = null;
+};
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Check for 401 and redirect to login
     if (error.response?.status === 401) {
       // Token expired or invalid - redirect to login (if not already there)
       const pathname = window.location.pathname;
@@ -24,6 +44,27 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    
+    // Check for 500 with traceback and show error modal
+    if (error.response?.status === 500 && globalErrorHandler) {
+      const responseData = error.response.data;
+      if (responseData?.traceback) {
+        // Handle the error with the modal
+        const handled = globalErrorHandler({
+          traceback: responseData.traceback,
+          error_type: responseData.error_type || 'InternalServerError',
+          error_message: responseData.error_message || responseData.detail || 'An internal server error occurred',
+          detail: responseData.detail,
+        });
+        
+        // If handled by modal, we still reject but the UI has shown the error
+        if (handled) {
+          // Return a rejected promise but the error modal is now shown
+          return Promise.reject(error);
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

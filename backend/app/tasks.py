@@ -2,7 +2,7 @@
 Background tasks for S3 Manager
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from app.celery_app import celery_app
 from app.database import SessionLocal
@@ -20,7 +20,7 @@ def cleanup_expired_shares(self):
     try:
         # Find all expired shares
         expired_shares = db.query(SharedLink).filter(
-            SharedLink.expires_at < datetime.utcnow(),
+            SharedLink.expires_at < datetime.now(timezone.utc),
             SharedLink.expires_at.isnot(None)
         ).all()
         

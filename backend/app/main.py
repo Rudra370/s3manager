@@ -5,17 +5,50 @@ Backend: FastAPI
 
 import os
 import re
+import subprocess
+import traceback
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, HTMLResponse
 
 
-from app.database import init_db, SessionLocal
+from app.database import SessionLocal
 from app.models import AppConfig
 from app.routers import admin, auth, buckets, objects, users, shares, storage_configs, tasks
 from app.logging_config import setup_logging, get_logger
+
+
+def run_migrations():
+    """Run Alembic migrations to ensure database is up to date."""
+    logger = get_logger(__name__)
+    logger.info("Running database migrations...")
+    
+    try:
+        # Run alembic upgrade head
+        result = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__))  # backend directory
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"Migration failed: {result.stderr}")
+            raise RuntimeError(f"Database migration failed: {result.stderr}")
+        
+        logger.info("Database migrations completed successfully")
+        if result.stdout:
+            logger.debug(f"Migration output: {result.stdout}")
+            
+    except FileNotFoundError:
+        logger.error("Alembic not found. Make sure alembic is installed.")
+        raise
+    except Exception as e:
+        logger.error(f"Migration error: {e}", exc_info=True)
+        raise
+
 
 # Initialize database on startup
 @asynccontextmanager
@@ -28,7 +61,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Application startup initiated")
     try:
-        init_db()
+        run_migrations()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}", exc_info=True)
@@ -72,6 +105,30 @@ app.include_router(tasks.router)
 def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# Global exception handler for 500 errors - returns full traceback
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler that returns full traceback for 500 errors."""
+    logger = get_logger(__name__)
+    
+    # Get full traceback
+    tb_str = traceback.format_exc()
+    
+    # Log the error
+    logger.error(f"Unhandled exception: {exc}\n{tb_str}")
+    
+    # Return JSON response with traceback
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An internal server error occurred",
+            "traceback": tb_str,
+            "error_type": type(exc).__name__,
+            "error_message": str(exc)
+        }
+    )
 
 
 def get_app_config_for_html():

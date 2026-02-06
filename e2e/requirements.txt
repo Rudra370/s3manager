@@ -9,3 +9,5 @@ python-dotenv>=1.0.0
 
 # HTTP requests for API calls (cleanup, verification)
 requests>=2.31.0
+
+# Note: PostgreSQL access is done via docker exec, no direct client needed

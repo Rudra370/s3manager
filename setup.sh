@@ -132,11 +132,11 @@ build_frontend() {
     print_success "Frontend built successfully"
 }
 
-# Create data directory for SQLite
+# Create data directory for any file storage needs
 create_data_dir() {
     print_info "Creating data directory..."
     mkdir -p data
-    print_success "Data directory created (SQLite database will be stored here)"
+    print_success "Data directory created"
 }
 
 # Copy frontend build to backend static folder
@@ -198,7 +198,7 @@ show_success_message() {
     echo "  - Restart:       docker-compose restart"
     echo ""
     echo -e "${YELLOW}Important:${NC}"
-    echo "  - Database is persisted in ./data directory"
+    echo "  - Database is persisted in Docker volume 'postgres_data'"
     echo "  - First time setup will prompt you to create an admin account"
     echo ""
 }
