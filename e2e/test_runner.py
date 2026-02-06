@@ -28,10 +28,21 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple, Optional
 
-# Load environment variables from parent directory's .env
+# Load environment variables from parent directory's .env files
 from dotenv import load_dotenv
-env_path = Path(__file__).parent.parent / '.env'
-load_dotenv(env_path)
+
+project_root = Path(__file__).parent.parent
+
+# Load base .env
+base_env = project_root / '.env'
+if base_env.exists():
+    load_dotenv(base_env)
+
+# Load environment-specific file
+env = os.getenv('APP_ENV', 'local')
+env_file = project_root / f'.env.{env}'
+if env_file.exists():
+    load_dotenv(env_file, override=True)
 
 # Playwright imports
 from playwright.sync_api import sync_playwright, expect, Page, Browser, BrowserContext
@@ -1989,8 +2000,9 @@ class S3ManagerE2ETests:
 def main():
     """Entry point"""
     # Check if .env file exists
-    if not env_path.exists():
-        log_error(f".env file not found at {env_path}")
+    base_env = Path(__file__).parent.parent / '.env'
+    if not base_env.exists():
+        log_error(f".env file not found at {base_env}")
         log_info("Please create .env file from .env.example")
         sys.exit(1)
     

@@ -20,3 +20,6 @@ psycopg2-binary>=2.9.0
 
 # Database migrations
 alembic>=1.13.0
+
+# Environment variable loading
+python-dotenv>=1.0.0

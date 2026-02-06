@@ -3,6 +3,9 @@ S3 Manager - Self-hosted S3 compatible object storage UI
 Backend: FastAPI
 """
 
+# Load environment configuration FIRST (before any other imports)
+from app.config import ENV, DEBUG, PORT, SECRET_KEY, ALLOWED_ORIGINS
+
 import os
 import re
 import subprocess
@@ -83,7 +86,7 @@ app = FastAPI(
 # CORS middleware - allow frontend to access API with credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:3012").split(","),
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -216,8 +219,11 @@ if os.path.exists(static_dir):
 if __name__ == "__main__":
     import uvicorn
     
-    port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     
-    uvicorn.run("app.main:app", host=host, port=port, reload=debug)
+    uvicorn.run(
+        "app.main:app",
+        host=host,
+        port=PORT,
+        reload=DEBUG
+    )

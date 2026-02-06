@@ -3,19 +3,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Database URL - PostgreSQL only
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://s3manager:s3manager@localhost:5432/s3manager"
-)
+# Import configuration (ensures env is loaded)
+from app.config import DATABASE_URL, DEBUG_SQL
 
 # Create engine with connection pooling for PostgreSQL
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
+    DATABASE_URL,
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,         # Number of connections to keep open
     max_overflow=10,     # Additional connections if pool is exhausted
-    echo=False           # Set to True for SQL query logging
+    echo=DEBUG_SQL       # Log SQL queries when DEBUG_SQL is enabled
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

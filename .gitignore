@@ -42,11 +42,16 @@ data/
 *.sqlite
 *.sqlite3
 
-# Environment
+# Environment - Local/private files (never commit)
 .env
 .env.local
 .env.*.local
 .env.test
+
+# Keep example files for reference
+# !.env.example
+# !.env.local.example
+# !.env.production.example
 # IDE
 .idea/
 .vscode/
