@@ -29,12 +29,20 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
 
 .PHONY: dev
-dev: ## Start development environment with hot reload
+dev: ## Start development environment
 	@echo "$(BLUE)Starting development environment...$(NC)"
 	$(DOCKER_COMPOSE) -f docker-compose.yml up --build -d
 	@echo "$(GREEN)✓ Services starting on http://localhost:$(PORT)$(NC)"
 	@echo "$(YELLOW)  - View logs: make logs$(NC)"
 	@echo "$(YELLOW)  - Stop: make stop$(NC)"
+
+.PHONY: dev-hot
+dev-hot: ## Start with hot reload (code changes auto-reload)
+	@echo "$(BLUE)Starting development environment with hot reload...$(NC)"
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d
+	@echo "$(GREEN)✓ Services starting with hot reload on http://localhost:$(PORT)$(NC)"
+	@echo "$(YELLOW)  - Code changes will auto-reload$(NC)"
+	@echo "$(YELLOW)  - View logs: make logs$(NC)"
 
 .PHONY: dev-build
 dev-build: ## Build and start services (fresh build)

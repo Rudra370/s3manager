@@ -1,0 +1,47 @@
+# Docker Compose Development Override
+# 
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   OR
+#   make dev-dev  (if using Makefile with the target)
+#
+# This file overrides production settings for local development:
+# - Enables hot reload (uvicorn --reload)
+# - Mounts source code for live editing
+# - Enables DEBUG mode
+# - Exposes PostgreSQL port for external tools
+
+services:
+  # PostgreSQL port is NOT exposed by default to avoid conflicts
+  # If you need external DB access, set POSTGRES_PORT in .env.local:
+  #   POSTGRES_PORT=5433
+  # Or uncomment below:
+  # postgres:
+  #   ports:
+  #     - "${POSTGRES_PORT:-5432}:5432"
+
+  s3manager:
+    # Mount source code for hot reload
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./backend/app/static:/app/app/static:ro
+    environment:
+      - APP_ENV=local
+      - DEBUG=true
+      - DEBUG_SQL=false
+      - LOG_LEVEL=debug
+    # Override command to enable auto-reload on code changes
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+
+  celery:
+    # Mount source code so Celery workers also see changes
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+    environment:
+      - APP_ENV=local
+      - DEBUG=true
+      - LOG_LEVEL=debug
