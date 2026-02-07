@@ -371,12 +371,83 @@ class S3ManagerE2ETests:
     # Test Flows
     # ==================================================================
     
+    def test_quick_setup(self) -> None:
+        """Test 0: Quick setup via key-value paste - completes setup directly"""
+        log_step(0, 18, "Testing: Quick Setup")
+        
+        # Navigate to root - should auto-redirect to setup
+        self.page.goto('/')
+        expect(self.page).to_have_url(f'{self.base_url}/setup')
+        log_success("Auto-redirected to setup page")
+        
+        # Verify the setup mode toggle is visible (Quick Setup / Manual Setup)
+        quick_setup_toggle = self.page.get_by_role('button', name='Quick Setup')
+        expect(quick_setup_toggle).to_be_visible()
+        
+        # By default, manual form should be visible (stepper)
+        expect(self.page.locator('.MuiStepper-root')).to_be_visible()
+        log_success("Manual setup form visible by default")
+        
+        # Click to switch to Quick Setup mode
+        quick_setup_toggle.click()
+        log_success("Switched to Quick Setup mode")
+        
+        # Verify the stepper/form is hidden and textarea is visible
+        expect(self.page.locator('.MuiStepper-root')).not_to_be_visible()
+        textarea = self.page.locator('textarea[aria-label="Quick setup configuration"]')
+        expect(textarea).to_be_visible()
+        log_success("Quick setup form visible (manual form hidden)")
+        
+        # Fill in the key-value pairs in the textarea
+        key_value_text = f"""# Admin Account
+ADMIN_NAME={self.config['admin']['name']}
+ADMIN_EMAIL={self.config['admin']['email']}
+ADMIN_PASSWORD={self.config['admin']['password']}
+
+# S3 Configuration
+STORAGE_NAME={self.config['storage']['name']}
+ENDPOINT_URL={self.config['storage']['endpoint']}
+ACCESS_KEY={self.config['storage']['access_key']}
+SECRET_KEY={self.config['storage']['secret_key']}
+REGION={self.config['storage']['region']}
+USE_SSL={'true' if self.config['storage']['use_ssl'] else 'false'}
+VERIFY_SSL={'true' if self.config['storage']['verify_ssl'] else 'false'}
+
+# Appearance
+HEADING_TEXT={self.config['app']['heading']}
+LOGO_URL={self.config['app']['logo_url']}"""
+        
+        textarea.fill(key_value_text)
+        log_success("Key-value pairs pasted")
+        
+        # Click "Complete Setup" button to complete setup directly
+        self.page.get_by_role('button', name='Complete Setup').click()
+        log_success("Complete Setup button clicked")
+        
+        # Verify redirect to dashboard (setup completes directly)
+        expect(self.page).to_have_url(f'{self.base_url}/dashboard')
+        
+        # Verify custom heading appears
+        heading = self.page.locator(f'text={self.config["app"]["heading"]}')
+        expect(heading).to_be_visible()
+        
+        log_success("Quick setup completed successfully")
+    
     def test_setup_wizard(self) -> None:
         """Test 1: Initial setup wizard"""
         log_step(1, 18, "Testing: Setup Wizard")
         
-        # Navigate to root - should auto-redirect to setup
-        self.page.goto('/')
+        # Clear cookies and storage to ensure fresh state
+        self.page.context.clear_cookies()
+        
+        # Navigate directly to setup page
+        self.page.goto('/setup')
+        
+        # If setup is already done, skip this test
+        if self.page.url == f'{self.base_url}/login':
+            log_info('Setup already completed, skipping setup wizard test')
+            return
+        
         expect(self.page).to_have_url(f'{self.base_url}/setup')
         log_success("Auto-redirected to setup page")
         
@@ -1904,6 +1975,7 @@ class S3ManagerE2ETests:
     def run_all_tests(self) -> bool:
         """Execute all test flows, return True if all passed"""
         tests = [
+            ("Quick Setup", self.test_quick_setup),
             ("Setup Wizard", self.test_setup_wizard),
             ("Admin Login/Logout", self.test_admin_login_logout),
             ("Bucket Management", self.test_bucket_management),

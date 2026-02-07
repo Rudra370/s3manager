@@ -24,6 +24,7 @@ import {
   Cloud as CloudIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +33,25 @@ import { useThemeMode } from '../contexts/ThemeContext';
 import { useAppConfig } from '../contexts/AppConfigContext';
 
 const steps = ['Admin Account', 'S3 Configuration', 'Customization'];
+
+// Example key-value pairs for quick setup
+const quickSetupExample = `# Paste your configuration in KEY=VALUE format
+# Required fields:
+ADMIN_NAME=Admin User
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=securepassword123
+
+STORAGE_NAME=My S3 Storage
+ENDPOINT_URL=https://s3.amazonaws.com
+ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+REGION=us-east-1
+USE_SSL=true
+VERIFY_SSL=true
+
+# Optional:
+HEADING_TEXT=My S3 Manager
+LOGO_URL=https://example.com/logo.png`;
 
 const SetupPage = ({ onSetupComplete }) => {
   const navigate = useNavigate();
@@ -42,6 +62,11 @@ const SetupPage = ({ onSetupComplete }) => {
 
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  // Quick setup mode
+  const [quickSetupOpen, setQuickSetupOpen] = useState(false);
+  const [quickSetupText, setQuickSetupText] = useState(quickSetupExample);
+  const [quickSetupError, setQuickSetupError] = useState('');
 
   // Admin account fields
   const [name, setName] = useState('');
@@ -62,6 +87,179 @@ const SetupPage = ({ onSetupComplete }) => {
   // Customization fields
   const [headingText, setHeadingText] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+
+  // Parse key-value pairs from quick setup text
+  const parseKeyValuePairs = (text) => {
+    const result = {};
+    const lines = text.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      // Try KEY=VALUE format
+      let match = trimmed.match(/^([A-Z_]+)\s*=\s*(.*)$/);
+      if (match) {
+        result[match[1]] = match[2].trim();
+        continue;
+      }
+      
+      // Try KEY: VALUE format
+      match = trimmed.match(/^([A-Z_]+)\s*:\s*(.*)$/);
+      if (match) {
+        result[match[1]] = match[2].trim();
+      }
+    }
+    
+    return result;
+  };
+
+  // Validate parsed configuration
+  const validateQuickSetup = (config) => {
+    const required = [
+      'ADMIN_NAME', 'ADMIN_EMAIL', 'ADMIN_PASSWORD',
+      'STORAGE_NAME', 'ENDPOINT_URL', 'ACCESS_KEY', 'SECRET_KEY', 'REGION'
+    ];
+    
+    const missing = required.filter(key => !config[key]);
+    
+    if (missing.length > 0) {
+      return {
+        valid: false,
+        error: `Missing required fields: ${missing.join(', ')}`
+      };
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(config.ADMIN_EMAIL)) {
+      return {
+        valid: false,
+        error: 'Invalid email format for ADMIN_EMAIL'
+      };
+    }
+    
+    // Validate password length
+    if (config.ADMIN_PASSWORD.length < 6) {
+      return {
+        valid: false,
+        error: 'ADMIN_PASSWORD must be at least 6 characters'
+      };
+    }
+    
+    // Validate boolean fields
+    const boolFields = ['USE_SSL', 'VERIFY_SSL'];
+    for (const field of boolFields) {
+      if (config[field]) {
+        const value = config[field].toLowerCase();
+        if (value !== 'true' && value !== 'false') {
+          return {
+            valid: false,
+            error: `${field} must be 'true' or 'false'`
+          };
+        }
+      }
+    }
+    
+    return { valid: true };
+  };
+
+  // Apply parsed configuration and complete setup directly
+  const applyQuickSetup = async () => {
+    setQuickSetupError('');
+    
+    const config = parseKeyValuePairs(quickSetupText);
+    const validation = validateQuickSetup(config);
+    
+    if (!validation.valid) {
+      setQuickSetupError(validation.error);
+      showSnackbar(validation.error, 'error');
+      return;
+    }
+    
+    // Apply admin account fields
+    setName(config.ADMIN_NAME || '');
+    setEmail(config.ADMIN_EMAIL || '');
+    setPassword(config.ADMIN_PASSWORD || '');
+    setConfirmPassword(config.ADMIN_PASSWORD || '');
+    
+    // Apply S3 config fields
+    setStorageConfigName(config.STORAGE_NAME || 'Default Storage');
+    setAccessKey(config.ACCESS_KEY || '');
+    setSecretKey(config.SECRET_KEY || '');
+    setRegion(config.REGION || 'us-east-1');
+    
+    // Handle endpoint URL with protocol
+    let endpoint = config.ENDPOINT_URL || '';
+    let protocol = 'https://';
+    if (endpoint.startsWith('https://')) {
+      protocol = 'https://';
+      endpoint = endpoint.substring(8);
+    } else if (endpoint.startsWith('http://')) {
+      protocol = 'http://';
+      endpoint = endpoint.substring(7);
+    }
+    setUrlProtocol(protocol);
+    setEndpointUrl(endpoint);
+    
+    // Apply boolean fields
+    const useSslValue = config.USE_SSL?.toLowerCase() !== 'false';
+    const verifySslValue = config.VERIFY_SSL?.toLowerCase() !== 'false';
+    setUseSsl(useSslValue);
+    setVerifySsl(verifySslValue);
+    
+    // Apply optional customization fields
+    const headingTextValue = config.HEADING_TEXT || '';
+    const logoUrlValue = config.LOGO_URL || '';
+    setHeadingText(headingTextValue);
+    setLogoUrl(logoUrlValue);
+    
+    // Combine protocol and endpoint URL for submission
+    const fullEndpointUrl = endpoint 
+      ? (endpoint.match(/^https?:\/\//) ? endpoint : protocol + endpoint)
+      : null;
+    
+    // Complete setup directly
+    setLoading(true);
+    
+    try {
+      const result = await setup({
+        name: config.ADMIN_NAME,
+        email: config.ADMIN_EMAIL,
+        password: config.ADMIN_PASSWORD,
+        storage_config_name: (config.STORAGE_NAME || 'Default Storage').trim(),
+        endpoint_url: fullEndpointUrl,
+        access_key: config.ACCESS_KEY || null,
+        secret_key: config.SECRET_KEY || null,
+        region: config.REGION || 'us-east-1',
+        use_ssl: useSslValue,
+        verify_ssl: verifySslValue,
+        heading_text: headingTextValue || null,
+        logo_url: logoUrlValue || null,
+      });
+
+      showSnackbar('Setup completed successfully!', 'success');
+      
+      // Refresh app config to get new heading/logo
+      refreshConfig();
+      
+      // Notify parent that setup is complete
+      if (onSetupComplete) {
+        onSetupComplete();
+      }
+      
+      // Navigate to dashboard after successful setup
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      showSnackbar(
+        error.response?.data?.detail || 'Setup failed. Please check your configuration and try again.',
+        'error'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const validateStep1 = () => {
     if (!name || !email || !password) {
@@ -191,15 +389,31 @@ const SetupPage = ({ onSetupComplete }) => {
             Welcome! Let's set up your S3 Manager instance.
           </Typography>
 
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
+          {/* Mode Toggle */}
+          <Box mb={3} display="flex" justifyContent="center">
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setQuickSetupOpen(!quickSetupOpen)}
+              startIcon={<SettingsIcon />}
+            >
+              {quickSetupOpen ? 'Manual Setup' : 'Quick Setup'}
+            </Button>
+          </Box>
 
-          {activeStep === 0 && (
+          {/* Show stepper only in manual mode */}
+          {!quickSetupOpen && (
+            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+              {steps.map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+          )}
+
+          {/* Manual Setup Form */}
+          {!quickSetupOpen && activeStep === 0 && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Create Admin Account
@@ -258,7 +472,7 @@ const SetupPage = ({ onSetupComplete }) => {
             </Box>
           )}
 
-          {activeStep === 1 && (
+          {!quickSetupOpen && activeStep === 1 && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Configure S3 Storage
@@ -378,7 +592,7 @@ const SetupPage = ({ onSetupComplete }) => {
             </Box>
           )}
 
-          {activeStep === 2 && (
+          {!quickSetupOpen && activeStep === 2 && (
             <Box>
               <Typography variant="h6" gutterBottom>
                 Customize Appearance
@@ -432,6 +646,61 @@ const SetupPage = ({ onSetupComplete }) => {
                   variant="contained"
                   onClick={handleSubmit}
                   disabled={loading}
+                  size="large"
+                >
+                  {loading ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    'Complete Setup'
+                  )}
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* Quick Setup Mode - Replaces the form when active */}
+          {quickSetupOpen && (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Quick Setup
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Paste your configuration in KEY=VALUE format. All fields will be filled for your review before proceeding.
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                Supported formats: KEY=VALUE or KEY: VALUE
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={14}
+                value={quickSetupText}
+                onChange={(e) => setQuickSetupText(e.target.value)}
+                error={!!quickSetupError}
+                helperText={quickSetupError}
+                sx={{
+                  mt: 1,
+                  fontFamily: 'monospace',
+                  '& .MuiInputBase-input': {
+                    fontFamily: 'monospace',
+                    fontSize: '0.875rem',
+                  },
+                }}
+                inputProps={{
+                  'aria-label': 'Quick setup configuration',
+                }}
+              />
+              <Box mt={3} display="flex" justifyContent="space-between">
+                <Button
+                  onClick={() => setQuickSetupOpen(false)}
+                  disabled={loading}
+                >
+                  Back to Manual
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={applyQuickSetup}
+                  disabled={!quickSetupText.trim() || loading}
                   size="large"
                 >
                   {loading ? (
