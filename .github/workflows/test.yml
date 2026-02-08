@@ -87,8 +87,28 @@ jobs:
 
       - name: Check service health
         run: |
+          # Check MinIO
           curl -sf http://localhost:9000/minio/health/live || (echo "MinIO health check failed" && exit 1)
-          curl -sf http://localhost:3012/api/health || (echo "API health check failed" && exit 1)
+          echo "✅ MinIO is healthy"
+          
+          # Check API with more details
+          echo "Checking API health..."
+          curl -v http://localhost:3012/api/health 2>&1 || true
+          
+          # Try a few times
+          for i in 1 2 3; do
+            echo "Attempt $i..."
+            if curl -sf http://localhost:3012/api/health; then
+              echo "✅ API is healthy"
+              exit 0
+            fi
+            sleep 10
+          done
+          
+          echo "❌ API health check failed after 3 attempts"
+          echo "=== S3Manager logs ==="
+          docker compose logs s3manager 2>&1 | tail -50
+          exit 1
 
       - name: Run E2E tests
         id: tests
