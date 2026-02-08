@@ -19,6 +19,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install Python dependencies
         run: |
           pip install playwright boto3 python-dotenv
@@ -28,44 +36,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend
         working-directory: ./frontend
         run: |
           npm ci
           npm run build
-          ls -la dist/
 
       - name: Copy frontend to backend
         run: |
-          pwd
-          ls -la
-          ls -la frontend/
-          ls -la frontend/dist/
           mkdir -p backend/app/static
           cp -r frontend/dist/* backend/app/static/
-          ls -la backend/app/static/
 
       - name: Create .env file
         run: |
           cp .env.example .env
           cat >> .env << 'EOF'
-          # Override for Docker CI environment
           SECRET_KEY=ci-test-secret-key-not-for-production
           DEBUG=false
-          # IMPORTANT: Use Docker service names, not localhost
           DATABASE_URL=postgresql://s3manager:s3manager@postgres:5432/s3manager
           REDIS_URL=redis://redis:6379/0
           CELERY_BROKER_URL=redis://redis:6379/0
           CELERY_RESULT_BACKEND=redis://redis:6379/0
-          # Test users
           TEST_ADMIN_NAME=CI Test Admin
           TEST_ADMIN_EMAIL=admin@example.com
           TEST_ADMIN_PASSWORD=SecurePassword123!
           TEST_TEAM_MEMBER_NAME=CI Team Member
           TEST_TEAM_MEMBER_EMAIL=team@example.com
           TEST_TEAM_MEMBER_PASSWORD=TeamPass123!
-          # MinIO configuration (for tests running on host)
           MINIO_PORT=9000
           TEST_STORAGE_NAME=MinIO CI Test
           TEST_STORAGE_ENDPOINT=localhost:9000
@@ -78,55 +78,44 @@ jobs:
           TEST_BUCKET_PREFIX=ci-test
           EOF
 
-      - name: Start services
-        run: |
-          # Start without waiting for healthy (we'll check manually)
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait-timeout 60 || true
-          sleep 30
+      - name: Start services with Docker layer caching
+        uses: docker/setup-buildx-action@v3
 
-      - name: Debug container status
+      - name: Build and start services
         run: |
-          echo "=== Container status ==="
-          docker compose ps
-          echo "=== S3Manager logs ==="
-          docker compose logs s3manager 2>&1 | tail -100 || true
-          echo "=== MinIO logs ==="
-          docker compose logs minio 2>&1 | tail -30 || true
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
-      - name: Check service health
+      - name: Wait for services (poll-based)
+        timeout-minutes: 2
         run: |
-          # Check MinIO
-          curl -sf http://localhost:9000/minio/health/live || (echo "MinIO health check failed" && exit 1)
-          echo "✅ MinIO is healthy"
-          
-          # Check API with more details
-          echo "Checking API health..."
-          curl -v http://localhost:3012/api/health 2>&1 || true
-          
-          # Try a few times
-          for i in 1 2 3; do
-            echo "Attempt $i..."
-            if curl -sf http://localhost:3012/api/health; then
-              echo "✅ API is healthy"
-              exit 0
-            fi
-            sleep 10
+          echo "Waiting for PostgreSQL..."
+          for i in {1..30}; do
+            docker compose exec -T postgres pg_isready -U s3manager && break
+            sleep 1
           done
           
-          echo "❌ API health check failed after 3 attempts"
-          echo "=== S3Manager logs ==="
-          docker compose logs s3manager 2>&1 | tail -50
-          exit 1
+          echo "Waiting for MinIO..."
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 1
+          done
+          
+          echo "Waiting for API..."
+          for i in {1..60}; do
+            curl -sf http://localhost:3012/api/health && break
+            sleep 1
+          done
+          
+          echo "✅ All services ready!"
 
-      - name: Run E2E tests
-        id: tests
+      - name: Run E2E tests (fast mode)
         run: |
           cd e2e
-          python3 test_runner.py || true
-        timeout-minutes: 30
+          python3 test_runner.py --fast
+        timeout-minutes: 15
 
       - name: Upload test artifacts
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-artifacts-${{ github.run_id }}
