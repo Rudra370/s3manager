@@ -504,16 +504,16 @@ LOGO_URL={self.config['app']['logo_url']}"""
         """Test 1: Initial setup wizard"""
         log_step(1, 18, "Testing: Setup Wizard")
         
-        # Clear cookies and storage to ensure fresh state
-        self.page.context.clear_cookies()
-        
-        # Navigate directly to setup page
+        # Navigate directly to setup page first to check status
         self.page.goto('/setup')
         
-        # If setup is already done, skip this test
-        if self.page.url == f'{self.base_url}/login':
+        # If setup is already done, skip this test (don't clear cookies/logout)
+        if self.page.url == f'{self.base_url}/login' or self.page.url == f'{self.base_url}/dashboard':
             log_info('Setup already completed, skipping setup wizard test')
             return
+        
+        # Clear cookies and storage to ensure fresh state (only if actually running setup)
+        self.page.context.clear_cookies()
         
         expect(self.page).to_have_url(f'{self.base_url}/setup')
         log_success("Auto-redirected to setup page")
@@ -583,8 +583,16 @@ LOGO_URL={self.config['app']['logo_url']}"""
         """Test 2: Login and logout flows"""
         log_step(2, 18, "Testing: Admin Login/Logout")
         
+        # Ensure we're on the dashboard first
+        self.page.goto('/dashboard')
+        expect(self.page).to_have_url(f'{self.base_url}/dashboard', timeout=10000)
+        
+        # Wait for avatar button to be visible
+        avatar_btn = self.page.locator('button:has(.MuiAvatar-root)')
+        expect(avatar_btn).to_be_visible(timeout=10000)
+        
         # Logout first - click on Avatar IconButton then Sign out
-        self.page.locator('button:has(.MuiAvatar-root)').click()
+        avatar_btn.click()
         self.page.get_by_role('menuitem', name='Sign out').click()
         expect(self.page).to_have_url(f'{self.base_url}/login')
         log_success("Logout successful")
