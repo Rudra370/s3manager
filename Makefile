@@ -11,7 +11,8 @@ PORT ?= 3012
 # MinIO port for testing (can be overridden: make test MINIO_PORT=9001)
 MINIO_PORT ?= 9000
 
-# Detect docker compose command (docker-compose or docker compose)
+# Detect docker compose command (docker-compose v1 or docker compose v2)
+# GitHub Actions uses 'docker compose', local may use either
 DOCKER_COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 
 # Colors for output
