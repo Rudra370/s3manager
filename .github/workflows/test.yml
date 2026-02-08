@@ -24,52 +24,40 @@ jobs:
           pip install playwright boto3 python-dotenv
           playwright install chromium
 
-      - name: Set up Node.js (for frontend build)
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
-      - name: Build and copy frontend
+      - name: Build frontend
+        working-directory: ./frontend
         run: |
-          # Build frontend
-          cd frontend
           npm ci
           npm run build
-          
-          # Verify dist exists
-          if [ ! -d "dist" ]; then
-            echo "ERROR: dist directory not found after build"
-            exit 1
-          fi
-          
-          # Copy to backend (from root)
-          cd ..
+          ls -la dist/
+
+      - name: Copy frontend to backend
+        run: |
+          pwd
+          ls -la
+          ls -la frontend/
+          ls -la frontend/dist/
           mkdir -p backend/app/static
           cp -r frontend/dist/* backend/app/static/
-          echo "Frontend build copied successfully"
           ls -la backend/app/static/
 
       - name: Create .env file
         run: |
           cp .env.example .env
-          # Override with CI-specific values
           cat >> .env << 'EOF'
           SECRET_KEY=ci-test-secret-key-not-for-production
           DEBUG=false
-          
-          # Test admin user
           TEST_ADMIN_NAME=CI Test Admin
           TEST_ADMIN_EMAIL=admin@example.com
           TEST_ADMIN_PASSWORD=SecurePassword123!
-          
-          # Test team member
           TEST_TEAM_MEMBER_NAME=CI Team Member
           TEST_TEAM_MEMBER_EMAIL=team@example.com
           TEST_TEAM_MEMBER_PASSWORD=TeamPass123!
-          
-          # MinIO configuration (default - no real S3 needed)
           MINIO_PORT=9000
           TEST_STORAGE_NAME=MinIO CI Test
           TEST_STORAGE_ENDPOINT=localhost:9000
@@ -78,8 +66,6 @@ jobs:
           TEST_STORAGE_REGION=us-east-1
           TEST_STORAGE_USE_SSL=false
           TEST_STORAGE_VERIFY_SSL=false
-          
-          # Test configuration
           TEST_APP_HEADING=S3 Manager CI Test
           TEST_BUCKET_PREFIX=ci-test
           EOF
@@ -87,14 +73,11 @@ jobs:
       - name: Start services
         run: |
           docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-          # Wait for services to be healthy
           sleep 30
 
       - name: Check service health
         run: |
-          # Check MinIO
           curl -sf http://localhost:9000/minio/health/live || (docker compose logs minio && exit 1)
-          # Check API
           curl -sf http://localhost:3012/api/health || (docker compose logs s3manager && exit 1)
 
       - name: Run E2E tests
@@ -103,18 +86,6 @@ jobs:
           cd e2e
           python3 test_runner.py || true
         timeout-minutes: 30
-        # Don't fail the workflow - we check results manually
-
-      - name: Check test results
-        run: |
-          echo "Test execution completed"
-          echo "Key validations:"
-          echo "  ✅ MinIO started successfully"
-          echo "  ✅ Backend connected to MinIO"
-          echo "  ✅ Quick Setup test (verifies S3 functionality)"
-          echo ""
-          echo "Note: Some UI tests may have pre-existing issues."
-          echo "The critical MinIO integration tests should pass."
 
       - name: Upload test artifacts
         if: always()
