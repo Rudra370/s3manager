@@ -73,12 +73,20 @@ jobs:
       - name: Start services
         run: |
           docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-          sleep 30
+          echo "Waiting for services to start..."
+          sleep 45
 
       - name: Check service health
         run: |
-          curl -sf http://localhost:9000/minio/health/live || (docker compose logs minio && exit 1)
-          curl -sf http://localhost:3012/api/health || (docker compose logs s3manager && exit 1)
+          echo "=== Container status ==="
+          docker compose ps
+          echo "=== MinIO logs ==="
+          docker compose logs --tail=20 minio
+          echo "=== S3Manager logs ==="
+          docker compose logs --tail=50 s3manager || true
+          echo "=== Health checks ==="
+          curl -sf http://localhost:9000/minio/health/live || (echo "MinIO health check failed" && exit 1)
+          curl -sf http://localhost:3012/api/health || (echo "API health check failed" && exit 1)
 
       - name: Run E2E tests
         id: tests
