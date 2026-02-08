@@ -12,7 +12,7 @@ Usage:
     cd e2e && python3 test_runner.py
 
 Requirements:
-    - Docker and docker-compose installed
+    - Docker and docker compose installed
     - Python 3.8+
     - Playwright browsers installed: playwright install chromium
     - .env file configured in parent directory
@@ -251,10 +251,10 @@ class S3ManagerE2ETests:
         
         log_step(1, 3, "Resetting Environment (Full)")
         
-        # Stop docker-compose services first
+        # Stop docker compose services first
         log_info("Stopping Docker services...")
         result = subprocess.run(
-            ['docker-compose', 'down'],
+            ['docker compose', 'down'],
             cwd=self.project_root,
             capture_output=True,
             text=True
@@ -267,7 +267,7 @@ class S3ManagerE2ETests:
         # Start postgres and minio services first
         log_info("Starting PostgreSQL and MinIO services...")
         result = subprocess.run(
-            ['docker-compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 'postgres', 'minio'],
+            ['docker compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 'postgres', 'minio'],
             cwd=self.project_root,
             capture_output=True,
             text=True
@@ -291,7 +291,7 @@ class S3ManagerE2ETests:
         container_db_url = db_manager.get_database_url().replace('localhost:5433', 'postgres:5432')
         log_info(f"Test database created")
         
-        # Export test database URL for docker-compose (use internal Docker network)
+        # Export test database URL for docker compose (use internal Docker network)
         env = os.environ.copy()
         env['DATABASE_URL'] = container_db_url
         
@@ -299,7 +299,7 @@ class S3ManagerE2ETests:
         # Include docker-compose.dev.yml for MinIO support
         log_info("Starting application services...")
         result = subprocess.run(
-            ['docker-compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 's3manager', 'celery'],
+            ['docker compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 's3manager', 'celery'],
             cwd=self.project_root,
             capture_output=True,
             text=True,
@@ -2197,7 +2197,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         # Stop Docker services first
         log_info("Stopping Docker services...")
         subprocess.run(
-            ['docker-compose', 'down'],
+            ['docker compose', 'down'],
             cwd=self.project_root,
             capture_output=True
         )
