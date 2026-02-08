@@ -34,13 +34,26 @@ jobs:
       - name: Build frontend
         run: |
           cd frontend
+          pwd
+          ls -la
           npm ci
-          npm run build
-          echo "=== Build output ==="
-          ls -la dist/ || (echo "ERROR: dist directory not found" && exit 1)
+          npm run build 2>&1
+          echo "=== After build ==="
+          pwd
+          ls -la
+          echo "=== dist directory ==="
+          ls -la dist/ 2>/dev/null || echo "dist/ not found at $(pwd)/dist"
+          find . -name "dist" -type d 2>/dev/null || echo "No dist directory found"
 
       - name: Copy frontend build to backend
         run: |
+          echo "=== Current directory ==="
+          pwd
+          ls -la
+          echo "=== Frontend directory ==="
+          ls -la frontend/
+          echo "=== Checking for dist ==="
+          ls -la frontend/dist/ 2>/dev/null || (echo "ERROR: frontend/dist not found" && exit 1)
           mkdir -p backend/app/static
           cp -r frontend/dist/* backend/app/static/
           echo "=== Copied files ==="
