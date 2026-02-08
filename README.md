@@ -4,6 +4,10 @@
   A beautiful, self-hosted web interface for managing your S3-compatible storage.
 </p>
 
+<p align="center">
+  <img src="https://github.com/Rudra370/s3manager/workflows/E2E%20Tests/badge.svg" alt="E2E Tests">
+</p>
+
 ---
 
 ## Demo Video
