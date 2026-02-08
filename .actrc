@@ -1,0 +1,12 @@
+# act configuration for local GitHub Actions testing
+# Documentation: https://github.com/nektos/act
+
+# Use medium image (smaller than full, but has Node.js)
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Secrets (simulated)
+-s GITHUB_TOKEN=fake-token-for-local-testing
+
+# Environment variables
+-e CI=true
+-e GITHUB_ACTIONS=true
