@@ -32,7 +32,7 @@ jobs:
       - name: Build frontend
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
 
       - name: Copy frontend build to backend
