@@ -96,6 +96,14 @@ class S3ManagerE2ETests:
         self.buckets_to_cleanup: set = set()  # Track buckets for cleanup
         
         # Load config from environment
+        # Support MINIO_PORT for configurable MinIO testing
+        minio_port = os.getenv('MINIO_PORT', '9000')
+        default_endpoint = f'localhost:{minio_port}'
+        
+        # Detect if using MinIO (not real S3)
+        storage_endpoint = os.getenv('TEST_STORAGE_ENDPOINT', default_endpoint)
+        is_minio = 'amazonaws.com' not in storage_endpoint and 's3.' not in storage_endpoint
+        
         self.config = {
             'port': os.getenv('PORT', '3012'),
             'admin': {
@@ -109,13 +117,16 @@ class S3ManagerE2ETests:
                 'password': os.getenv('TEST_TEAM_MEMBER_PASSWORD', 'TeamPass123!'),
             },
             'storage': {
-                'name': os.getenv('TEST_STORAGE_NAME', 'Test Storage'),
-                'endpoint': os.getenv('TEST_STORAGE_ENDPOINT', ''),
-                'access_key': os.getenv('TEST_STORAGE_ACCESS_KEY', ''),
-                'secret_key': os.getenv('TEST_STORAGE_SECRET_KEY', ''),
-                'region': os.getenv('TEST_STORAGE_REGION', 'eu-central-1'),
-                'use_ssl': os.getenv('TEST_STORAGE_USE_SSL', 'true').lower() == 'true',
-                'verify_ssl': os.getenv('TEST_STORAGE_VERIFY_SSL', 'true').lower() == 'true',
+                'name': os.getenv('TEST_STORAGE_NAME', 'MinIO Test'),
+                'endpoint': storage_endpoint,
+                'access_key': os.getenv('TEST_STORAGE_ACCESS_KEY', 'minioadmin'),
+                'secret_key': os.getenv('TEST_STORAGE_SECRET_KEY', 'minioadmin'),
+                'region': os.getenv('TEST_STORAGE_REGION', 'us-east-1'),
+                'use_ssl': os.getenv('TEST_STORAGE_USE_SSL', 'false').lower() == 'true',
+                'verify_ssl': os.getenv('TEST_STORAGE_VERIFY_SSL', 'false').lower() == 'true',
+                # For MinIO: use 'minio:9000' for setup form (backend connects via Docker network)
+                'endpoint_for_backend': 'minio:9000' if is_minio else storage_endpoint,
+                'is_minio': is_minio,
             },
             'app': {
                 'heading': os.getenv('TEST_APP_HEADING', 'S3 Manager Test'),
@@ -253,22 +264,25 @@ class S3ManagerE2ETests:
         else:
             log_success("Docker services stopped")
         
-        # Start only postgres service first (so we can create test database)
-        log_info("Starting PostgreSQL service...")
+        # Start postgres and minio services first
+        log_info("Starting PostgreSQL and MinIO services...")
         result = subprocess.run(
-            ['docker-compose', 'up', '-d', 'postgres'],
+            ['docker-compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 'postgres', 'minio'],
             cwd=self.project_root,
             capture_output=True,
             text=True
         )
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to start PostgreSQL: {result.stderr}")
+            raise RuntimeError(f"Failed to start services: {result.stderr}")
         
         # Wait for PostgreSQL to be ready (accessible from host via mapped port)
         log_info("Waiting for PostgreSQL to be ready...")
         if not wait_for_postgres(timeout=60):
             raise RuntimeError("PostgreSQL failed to start within timeout")
         log_success("PostgreSQL is ready")
+        
+        # Wait for MinIO to be ready
+        self._wait_for_minio(timeout=30)
         
         # Create test database
         db_manager.create_test_database()
@@ -282,9 +296,10 @@ class S3ManagerE2ETests:
         env['DATABASE_URL'] = container_db_url
         
         # Start remaining services with test database URL
+        # Include docker-compose.dev.yml for MinIO support
         log_info("Starting application services...")
         result = subprocess.run(
-            ['docker-compose', 'up', '-d', 's3manager', 'celery'],
+            ['docker-compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 's3manager', 'celery'],
             cwd=self.project_root,
             capture_output=True,
             text=True,
@@ -319,6 +334,49 @@ class S3ManagerE2ETests:
                 print(".", end='', flush=True)
         
         raise RuntimeError(f"Services failed to start within {timeout} seconds")
+    
+    def _wait_for_minio(self, timeout: int = 30) -> bool:
+        """Wait for MinIO to be ready (if using MinIO)"""
+        storage = self.config['storage']
+        endpoint = storage['endpoint']
+        
+        # Check if using MinIO (not real S3)
+        if 'amazonaws.com' in endpoint or 's3.' in endpoint:
+            return True  # Real S3, no need to wait
+        
+        log_info(f"Waiting for MinIO at {endpoint}...")
+        
+        # Parse endpoint to get host and port
+        if ':' in endpoint:
+            host, port = endpoint.rsplit(':', 1)
+            port = int(port)
+        else:
+            host = endpoint
+            port = 9000
+        
+        # Clean up host (remove protocol if present)
+        host = host.replace('http://', '').replace('https://', '').strip('/')
+        
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                import socket
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)
+                result = sock.connect_ex((host, port))
+                sock.close()
+                
+                if result == 0:
+                    log_success("MinIO is ready!")
+                    return True
+            except Exception:
+                pass
+            
+            time.sleep(1)
+            print(".", end='', flush=True)
+        
+        log_warning(f"MinIO not ready within {timeout} seconds, proceeding anyway...")
+        return False
     
     # ==================================================================
     # Browser Management
@@ -399,6 +457,15 @@ class S3ManagerE2ETests:
         log_success("Quick setup form visible (manual form hidden)")
         
         # Fill in the key-value pairs in the textarea
+        # Use endpoint_for_backend for MinIO (Docker network) vs real S3
+        endpoint_for_setup = self.config['storage'].get('endpoint_for_backend', self.config['storage']['endpoint'])
+        
+        # Ensure protocol is included in endpoint for quick setup
+        # The frontend expects either http:// or https:// prefix
+        if not endpoint_for_setup.startswith(('http://', 'https://')):
+            protocol = 'https://' if self.config['storage']['use_ssl'] else 'http://'
+            endpoint_for_setup = protocol + endpoint_for_setup
+        
         key_value_text = f"""# Admin Account
 ADMIN_NAME={self.config['admin']['name']}
 ADMIN_EMAIL={self.config['admin']['email']}
@@ -406,7 +473,7 @@ ADMIN_PASSWORD={self.config['admin']['password']}
 
 # S3 Configuration
 STORAGE_NAME={self.config['storage']['name']}
-ENDPOINT_URL={self.config['storage']['endpoint']}
+ENDPOINT_URL={endpoint_for_setup}
 ACCESS_KEY={self.config['storage']['access_key']}
 SECRET_KEY={self.config['storage']['secret_key']}
 REGION={self.config['storage']['region']}
@@ -467,7 +534,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
         self.page.get_by_label('Storage Configuration Name *').fill(self.config['storage']['name'])
         
         # Handle protocol and endpoint
-        endpoint = self.config['storage']['endpoint']
+        # Use endpoint_for_backend for MinIO (Docker network) vs real S3
+        endpoint = self.config['storage'].get('endpoint_for_backend', self.config['storage']['endpoint'])
         if endpoint.startswith('https://'):
             protocol = 'https://'
             endpoint = endpoint[8:]
@@ -475,7 +543,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
             protocol = 'http://'
             endpoint = endpoint[7:]
         else:
-            protocol = 'https://'
+            # For MinIO without protocol, use http:// when SSL is disabled
+            protocol = 'https://' if self.config['storage']['use_ssl'] else 'http://'
         
         # Select protocol
         self.page.get_by_label('Protocol').click()
@@ -2197,9 +2266,9 @@ Fast mode will automatically fall back to full reset if services are not running
         sys.exit(1)
     
     # Check for required env vars
+    # Note: Storage credentials default to MinIO values if not set
     required = [
         'TEST_ADMIN_EMAIL', 'TEST_ADMIN_PASSWORD',
-        'TEST_STORAGE_ENDPOINT', 'TEST_STORAGE_ACCESS_KEY', 'TEST_STORAGE_SECRET_KEY',
         'TEST_TEAM_MEMBER_EMAIL', 'TEST_TEAM_MEMBER_PASSWORD'
     ]
     
@@ -2208,6 +2277,13 @@ Fast mode will automatically fall back to full reset if services are not running
         log_error(f"Missing required environment variables: {', '.join(missing)}")
         log_info("Please set these values in your .env file")
         sys.exit(1)
+    
+    # Log which storage backend is being used
+    storage_endpoint = os.getenv('TEST_STORAGE_ENDPOINT', f'localhost:{os.getenv("MINIO_PORT", "9000")}')
+    if 'amazonaws.com' in storage_endpoint or 's3.' in storage_endpoint:
+        log_info(f"Using REAL S3 for testing: {storage_endpoint}")
+    else:
+        log_info(f"Using MinIO for testing: {storage_endpoint}")
     
     # Run tests
     runner = S3ManagerE2ETests(fast_mode=args.fast)

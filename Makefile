@@ -8,6 +8,9 @@
 # Default port (can be overridden: make dev PORT=3000)
 PORT ?= 3012
 
+# MinIO port for testing (can be overridden: make test MINIO_PORT=9001)
+MINIO_PORT ?= 9000
+
 # Detect docker compose command (docker-compose or docker compose)
 DOCKER_COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 
@@ -85,15 +88,20 @@ logs-db: ## View database logs only
 # =============================================================================
 
 .PHONY: test
-test: ## Run full E2E test suite
-	@echo "$(BLUE)Running E2E tests...$(NC)"
+test: ## Run full E2E test suite with MinIO (no real S3 credentials needed)
+	@echo "$(BLUE)Running E2E tests with MinIO...$(NC)"
 	cd e2e && python3 test_runner.py
 
 .PHONY: test-fast
-test-fast: ## Run E2E tests with fast reset (truncate instead of recreate)
-	@echo "$(BLUE)Running E2E tests (fast mode)...$(NC)"
+test-fast: ## Run E2E tests with fast reset and MinIO
+	@echo "$(BLUE)Running E2E tests (fast mode) with MinIO...$(NC)"
 	@echo "$(YELLOW)Note: Falls back to full reset if services not running$(NC)"
 	cd e2e && python3 test_runner.py --fast
+
+.PHONY: test-live
+test-live: ## Run E2E tests against REAL S3 (requires credentials in .env)
+	@echo "$(YELLOW)⚠️  Running tests against REAL S3 - check your .env credentials$(NC)"
+	cd e2e && python3 test_runner.py
 
 .PHONY: test-smoke
 test-smoke: ## Run a quick smoke test (basic health check)
@@ -103,6 +111,38 @@ test-smoke: ## Run a quick smoke test (basic health check)
 	@echo "  - Checking frontend..."
 	@curl -sf http://localhost:$(PORT) >/dev/null && echo "$(GREEN)  ✓ Frontend is serving$(NC)" || (echo "$(RED)  ✗ Frontend is not responding$(NC)" && exit 1)
 	@echo "$(GREEN)✓ Smoke tests passed$(NC)"
+
+# =============================================================================
+# MinIO Testing Commands
+# =============================================================================
+
+.PHONY: minio-up
+minio-up: ## Start MinIO for testing (S3-compatible, no credentials needed)
+	@echo "$(BLUE)Starting MinIO...$(NC)"
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d minio minio-init
+	@echo "$(GREEN)✓ MinIO is ready at localhost:$(MINIO_PORT)$(NC)"
+	@echo "$(YELLOW)  - S3 API: http://localhost:$(MINIO_PORT)$(NC)"
+	@echo "$(YELLOW)  - Access Key: minioadmin$(NC)"
+	@echo "$(YELLOW)  - Secret Key: minioadmin$(NC)"
+
+.PHONY: minio-down
+minio-down: ## Stop MinIO service
+	@echo "$(BLUE)Stopping MinIO...$(NC)"
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml stop minio minio-init
+	@echo "$(GREEN)✓ MinIO stopped$(NC)"
+
+.PHONY: minio-reset
+minio-reset: ## Reset MinIO data (wipe all buckets and restart)
+	@echo "$(YELLOW)Resetting MinIO data...$(NC)"
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml stop minio
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml rm -f minio minio-init
+	docker volume rm -f s3manager_minio_data 2>/dev/null || true
+	$(MAKE) minio-up
+	@echo "$(GREEN)✓ MinIO reset complete$(NC)"
+
+.PHONY: minio-logs
+minio-logs: ## View MinIO logs
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml logs -f minio
 
 # =============================================================================
 # Database Commands
