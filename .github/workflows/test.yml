@@ -1,0 +1,107 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install playwright boto3 python-dotenv
+          playwright install chromium
+
+      - name: Set up Node.js (for frontend build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Copy frontend build to backend
+        run: |
+          mkdir -p backend/app/static
+          cp -r frontend/dist/* backend/app/static/
+
+      - name: Create .env file
+        run: |
+          cp .env.example .env
+          # Override with CI-specific values
+          cat >> .env << 'EOF'
+          SECRET_KEY=ci-test-secret-key-not-for-production
+          DEBUG=false
+          
+          # Test admin user
+          TEST_ADMIN_NAME=CI Test Admin
+          TEST_ADMIN_EMAIL=admin@example.com
+          TEST_ADMIN_PASSWORD=SecurePassword123!
+          
+          # Test team member
+          TEST_TEAM_MEMBER_NAME=CI Team Member
+          TEST_TEAM_MEMBER_EMAIL=team@example.com
+          TEST_TEAM_MEMBER_PASSWORD=TeamPass123!
+          
+          # MinIO configuration (default - no real S3 needed)
+          MINIO_PORT=9000
+          TEST_STORAGE_NAME=MinIO CI Test
+          TEST_STORAGE_ENDPOINT=localhost:9000
+          TEST_STORAGE_ACCESS_KEY=minioadmin
+          TEST_STORAGE_SECRET_KEY=minioadmin
+          TEST_STORAGE_REGION=us-east-1
+          TEST_STORAGE_USE_SSL=false
+          TEST_STORAGE_VERIFY_SSL=false
+          
+          # Test configuration
+          TEST_APP_HEADING=S3 Manager CI Test
+          TEST_BUCKET_PREFIX=ci-test
+          EOF
+
+      - name: Start services
+        run: |
+          docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+          # Wait for services to be healthy
+          sleep 30
+
+      - name: Check service health
+        run: |
+          # Check MinIO
+          curl -sf http://localhost:9000/minio/health/live || exit 1
+          # Check API
+          curl -sf http://localhost:3012/api/health || exit 1
+
+      - name: Run E2E tests
+        run: |
+          cd e2e
+          python3 test_runner.py
+        timeout-minutes: 30
+
+      - name: Upload test artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            e2e/test_results/
+            e2e/test_videos/
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
