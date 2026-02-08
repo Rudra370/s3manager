@@ -41,7 +41,10 @@ jobs:
           EOF
 
       - name: Run tests
-        run: make test
+        run: |
+          # Use docker compose instead of docker-compose
+          sed -i 's/docker-compose/docker compose/g' Makefile
+          make test
         timeout-minutes: 30
 
       - name: Upload artifacts on failure

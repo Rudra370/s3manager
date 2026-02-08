@@ -75,16 +75,16 @@ jobs:
 
       - name: Start services
         run: |
-          docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
           # Wait for services to be healthy
           sleep 30
 
       - name: Check service health
         run: |
           # Check MinIO
-          curl -sf http://localhost:9000/minio/health/live || exit 1
+          curl -sf http://localhost:9000/minio/health/live || (docker compose logs minio && exit 1)
           # Check API
-          curl -sf http://localhost:3012/api/health || exit 1
+          curl -sf http://localhost:3012/api/health || (docker compose logs s3manager && exit 1)
 
       - name: Run E2E tests
         id: tests
@@ -117,4 +117,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
