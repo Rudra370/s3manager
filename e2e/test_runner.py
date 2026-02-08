@@ -803,8 +803,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
             try:
                 if dialog.is_visible(timeout=2000):
                     dialog.get_by_role('button', name='Cancel').click()
-            except:
-                pass
+            except Exception as e:
+                log_info(f"Dialog cleanup skipped: {e}")
         
         # Switch to second storage and create buckets
         # First, go to dashboard and reload to ensure storage dropdown is updated
