@@ -50,14 +50,22 @@ jobs:
         run: |
           cp .env.example .env
           cat >> .env << 'EOF'
+          # Override for Docker CI environment
           SECRET_KEY=ci-test-secret-key-not-for-production
           DEBUG=false
+          # IMPORTANT: Use Docker service names, not localhost
+          DATABASE_URL=postgresql://s3manager:s3manager@postgres:5432/s3manager
+          REDIS_URL=redis://redis:6379/0
+          CELERY_BROKER_URL=redis://redis:6379/0
+          CELERY_RESULT_BACKEND=redis://redis:6379/0
+          # Test users
           TEST_ADMIN_NAME=CI Test Admin
           TEST_ADMIN_EMAIL=admin@example.com
           TEST_ADMIN_PASSWORD=SecurePassword123!
           TEST_TEAM_MEMBER_NAME=CI Team Member
           TEST_TEAM_MEMBER_EMAIL=team@example.com
           TEST_TEAM_MEMBER_PASSWORD=TeamPass123!
+          # MinIO configuration (for tests running on host)
           MINIO_PORT=9000
           TEST_STORAGE_NAME=MinIO CI Test
           TEST_STORAGE_ENDPOINT=localhost:9000
