@@ -254,7 +254,7 @@ class S3ManagerE2ETests:
         # Stop docker compose services first
         log_info("Stopping Docker services...")
         result = subprocess.run(
-            ['docker compose', 'down'],
+            ['docker', 'compose', 'down'],
             cwd=self.project_root,
             capture_output=True,
             text=True
@@ -267,7 +267,7 @@ class S3ManagerE2ETests:
         # Start postgres and minio services first
         log_info("Starting PostgreSQL and MinIO services...")
         result = subprocess.run(
-            ['docker compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 'postgres', 'minio'],
+            ['docker', 'compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 'postgres', 'minio'],
             cwd=self.project_root,
             capture_output=True,
             text=True
@@ -299,7 +299,7 @@ class S3ManagerE2ETests:
         # Include docker-compose.dev.yml for MinIO support
         log_info("Starting application services...")
         result = subprocess.run(
-            ['docker compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 's3manager', 'celery'],
+            ['docker', 'compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'up', '-d', 's3manager', 'celery'],
             cwd=self.project_root,
             capture_output=True,
             text=True,
@@ -2197,7 +2197,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         # Stop Docker services first
         log_info("Stopping Docker services...")
         subprocess.run(
-            ['docker compose', 'down'],
+            ['docker', 'compose', 'down'],
             cwd=self.project_root,
             capture_output=True
         )
