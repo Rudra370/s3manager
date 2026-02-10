@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 
 from app.database import SessionLocal
 from app.models import AppConfig
-from app.routers import admin, auth, buckets, objects, users, shares, storage_configs, tasks
+from app.routers import admin, auth, buckets, objects, users, shares, storage_configs, tasks, multipart
 from app.logging_config import setup_logging, get_logger
 
 
@@ -101,6 +101,7 @@ app.include_router(users.router)
 app.include_router(shares.router)
 app.include_router(storage_configs.router)
 app.include_router(tasks.router)
+app.include_router(multipart.router)
 
 
 # Health check

@@ -9,6 +9,8 @@ import { AppConfigProvider } from './contexts/AppConfigContext'
 import { SnackbarProvider } from './contexts/SnackbarContext'
 import { TaskProvider } from './contexts/TaskContext'
 
+import { UploadPreferencesProvider } from './contexts/UploadPreferencesContext'
+
 // Inner component that has access to theme
 const ThemedApp = () => {
   const { theme } = useThemeMode();
@@ -16,13 +18,15 @@ const ThemedApp = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SnackbarProvider>
-        <TaskProvider>
-          <AppConfigProvider>
-            <App />
-          </AppConfigProvider>
-        </TaskProvider>
-      </SnackbarProvider>
+      <UploadPreferencesProvider>
+        <SnackbarProvider>
+          <TaskProvider>
+            <AppConfigProvider>
+              <App />
+            </AppConfigProvider>
+          </TaskProvider>
+        </SnackbarProvider>
+      </UploadPreferencesProvider>
     </ThemeProvider>
   );
 };

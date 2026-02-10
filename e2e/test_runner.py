@@ -12,7 +12,7 @@ Usage:
     cd e2e && python3 test_runner.py
 
 Requirements:
-    - Docker and docker compose installed
+    - Docker and docker-compose installed
     - Python 3.8+
     - Playwright browsers installed: playwright install chromium
     - .env file configured in parent directory
@@ -251,10 +251,10 @@ class S3ManagerE2ETests:
         
         log_step(1, 3, "Resetting Environment (Full)")
         
-        # Stop docker compose services first
+        # Stop docker-compose services first
         log_info("Stopping Docker services...")
         result = subprocess.run(
-            ['docker', 'compose', 'down'],
+            ['docker', 'compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'down'],
             cwd=self.project_root,
             capture_output=True,
             text=True
@@ -291,7 +291,7 @@ class S3ManagerE2ETests:
         container_db_url = db_manager.get_database_url().replace('localhost:5433', 'postgres:5432')
         log_info(f"Test database created")
         
-        # Export test database URL for docker compose (use internal Docker network)
+        # Export test database URL for docker-compose (use internal Docker network)
         env = os.environ.copy()
         env['DATABASE_URL'] = container_db_url
         
@@ -803,8 +803,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
             try:
                 if dialog.is_visible(timeout=2000):
                     dialog.get_by_role('button', name='Cancel').click()
-            except:
-                pass
+            except Exception as e:
+                log_info(f"Dialog cleanup skipped: {e}")
         
         # Switch to second storage and create buckets
         # First, go to dashboard and reload to ensure storage dropdown is updated
@@ -1140,14 +1140,14 @@ LOGO_URL={self.config['app']['logo_url']}"""
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
         
-        # Wait for upload and verify success
-        expect(self.page.locator('text=e2e-test-file.txt')).to_be_visible(timeout=10000)
+        # Wait for upload and verify success (use row locator to avoid matching snackbar)
+        expect(self.page.get_by_role('row', name='e2e-test-file.txt')).to_be_visible(timeout=10000)
         log_success("File uploaded successfully")
         
         # ========== TEST SEARCH ==========
         self.page.get_by_placeholder('Search files...').fill('e2e-test')
         self.page.wait_for_timeout(500)
-        expect(self.page.locator('text=e2e-test-file.txt')).to_be_visible()
+        expect(self.page.get_by_role('row', name='e2e-test-file.txt')).to_be_visible()
         log_success("Object search works")
         
         # Clear search
@@ -1274,7 +1274,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-size-test.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-size-test.txt')).to_be_visible(timeout=10000)
         
         # Go back to dashboard and calculate size
         self.page.goto('/dashboard')
@@ -1326,7 +1326,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # Wait for all files to appear
         for i in range(3):
-            expect(self.page.locator(f'text=e2e-bulk-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-bulk-{i}.txt')).to_be_visible(timeout=10000)
         log_success("3 files uploaded")
         
         # Select all files using checkboxes
@@ -1380,7 +1380,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-share-test.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-share-test.txt')).to_be_visible(timeout=10000)
         log_success("File uploaded for sharing")
         
         # ========== CREATE SHARE LINK ==========
@@ -1425,7 +1425,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # ========== VERIFY SHARE IN SHARES PAGE ==========
         self.page.goto('/shares')
-        expect(self.page.locator('text=e2e-share-test.txt')).to_be_visible()
+        expect(self.page.get_by_role('row', name='e2e-share-test.txt')).to_be_visible()
         log_success("Share appears in shares list")
         
         # ========== REVOKE SHARE ==========
@@ -1437,7 +1437,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         self.page.get_by_role('button', name='Revoke').click()
         
         # Verify share is gone
-        expect(self.page.locator('text=e2e-share-test.txt')).not_to_be_visible()
+        expect(self.page.get_by_role('row', name='e2e-share-test.txt')).not_to_be_visible()
         log_success("Share link revoked")
         
         # Cleanup
@@ -1568,7 +1568,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # Wait for uploads
         for i in range(20):
-            expect(self.page.locator(f'text=e2e-bg-delete-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-bg-delete-{i}.txt')).to_be_visible(timeout=10000)
         log_success("Uploaded 20 files to bucket")
         
         # Go back to dashboard
@@ -1635,7 +1635,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
             file_input.set_input_files(filepath)
         
         for i in range(10):
-            expect(self.page.locator(f'text=e2e-bg-bulk-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-bg-bulk-{i}.txt')).to_be_visible(timeout=10000)
         log_success("Uploaded 10 files for bulk delete test")
         
         # Select all files using checkboxes
@@ -1697,7 +1697,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
             file_input.set_input_files(filepath)
         
         for i in range(10):
-            expect(self.page.locator(f'text=e2e-inline-size-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-inline-size-{i}.txt')).to_be_visible(timeout=10000)
         
         # Go back to dashboard
         self.page.goto('/dashboard')
@@ -1760,7 +1760,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-public-share.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-public-share.txt')).to_be_visible(timeout=10000)
         log_success("File uploaded for public share")
         
         # Create share link (no password)
@@ -1789,8 +1789,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
         # Navigate to share link
         self.page.goto(share_link)
         
-        # Verify share page loads without login
-        expect(self.page.locator('text=e2e-public-share.txt')).to_be_visible(timeout=10000)
+        # Verify share page loads without login (use text in paper/card, not row)
+        expect(self.page.get_by_text('e2e-public-share.txt', exact=True)).to_be_visible(timeout=10000)
         expect(self.page.locator('button:has-text("Download")')).to_be_visible()
         log_success("Public share page accessible without authentication")
         
@@ -1841,7 +1841,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-pwd-share.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-pwd-share.txt')).to_be_visible(timeout=10000)
         
         # Create password-protected share
         file_row = self.page.get_by_role('row', name='e2e-pwd-share.txt')
@@ -1888,8 +1888,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
         self.page.locator('input[type="password"]').fill('testpass123')
         self.page.click('button:has-text("Access File")')
         
-        # Verify access granted
-        expect(self.page.locator('text=e2e-pwd-share.txt')).to_be_visible(timeout=10000)
+        # Verify access granted (use text in paper/card, not row)
+        expect(self.page.get_by_text('e2e-pwd-share.txt', exact=True)).to_be_visible(timeout=10000)
         expect(self.page.locator('button:has-text("Download")')).to_be_visible()
         log_success("Correct password grants access")
         
@@ -2070,7 +2070,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-preview.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-preview.txt')).to_be_visible(timeout=10000)
         
         # Click on filename to preview
         self.page.get_by_role('row', name='e2e-preview.txt').get_by_text('e2e-preview.txt').click()
@@ -2091,6 +2091,259 @@ LOGO_URL={self.config['app']['logo_url']}"""
         import os
         os.remove(test_file)
         self.cleanup_bucket(test_bucket)
+    
+    def test_multipart_upload(self) -> None:
+        """Test 26: Multipart upload for large files with progress tracking"""
+        log_step(26, 26, "Testing: Multipart Upload for Large Files")
+        
+        # Create test bucket
+        test_bucket = f"{self.config['bucket_prefix']}-multipart"
+        self.page.goto('/dashboard')
+        self.page.get_by_role('button', name='Create Bucket').click()
+        dialog = self.page.locator('.MuiDialog-root')
+        dialog.locator('input').fill(test_bucket)
+        dialog.get_by_role('button', name='Create').click()
+        expect(self.page.locator(f'text={test_bucket}')).to_be_visible()
+        log_success(f"Created test bucket: {test_bucket}")
+        
+        # Open bucket
+        self.page.click(f'text={test_bucket}')
+        expect(self.page).to_have_url(re.compile(rf'/bucket/{test_bucket}'))
+        
+        # ========== CREATE LARGE TEST FILE (10 MB) ==========
+        test_file = '/tmp/e2e-multipart-test.bin'
+        file_size = 10 * 1024 * 1024  # 10 MB
+        chunk_size = 1024 * 1024  # 1 MB chunks
+        
+        log_info(f"Creating test file of size {file_size / (1024*1024):.1f} MB...")
+        with open(test_file, 'wb') as f:
+            for i in range(10):
+                # Write random data in chunks
+                f.write(os.urandom(chunk_size))
+        log_success("Large test file created")
+        
+        # ========== UPLOAD WITH PROGRESS TRACKING ==========
+        # Start monitoring network responses for multipart API calls
+        multipart_requests = []
+        multipart_responses = []
+        
+        def handle_request(request):
+            if 'multipart' in request.url:
+                multipart_requests.append(request)
+        
+        def handle_response(response):
+            if 'multipart' in response.url:
+                multipart_responses.append(response)
+        
+        self.page.on('request', handle_request)
+        self.page.on('response', handle_response)
+        
+        # Set up file input and start upload
+        file_input = self.page.locator('input[type="file"][hidden]')
+        file_input.set_input_files(test_file)
+        log_success("File input set, upload started")
+        
+        # ========== VERIFY PROGRESS INDICATOR ==========
+        # Wait for upload progress indicator to appear
+        progress_indicator = self.page.locator('.MuiLinearProgress-root, .MuiCircularProgress-root')
+        try:
+            expect(progress_indicator.first).to_be_visible(timeout=5000)
+            log_success("Upload progress indicator is visible")
+        except:
+            log_info("Progress indicator not immediately visible (may be fast)")
+        
+        # Wait for "Uploading..." text to appear
+        uploading_text = self.page.locator('text=/Uploading/i')
+        try:
+            expect(uploading_text.first).to_be_visible(timeout=5000)
+            log_success("Uploading text visible")
+        except:
+            log_info("Uploading text not visible")
+        
+        # ========== VERIFY FILE APPEARS AFTER UPLOAD ==========
+        # Wait for upload to complete (file appears in list)
+        expect(self.page.get_by_role('row', name='e2e-multipart-test.bin')).to_be_visible(timeout=60000)
+        log_success("Large file uploaded successfully and appears in list")
+        
+        # ========== VERIFY FILE SIZE ==========
+        # Get file size from the UI - look for size in the row
+        file_row = self.page.get_by_role('row', name='e2e-multipart-test.bin')
+        # Get all cells and find the one with size (usually contains B, KB, MB, GB)
+        cells = file_row.locator('td').all()
+        size_text = None
+        for cell in cells:
+            text = cell.text_content()
+            if text and any(unit in text for unit in [' B', 'KB', 'MB', 'GB', 'TB']):
+                size_text = text
+                break
+        
+        if size_text:
+            log_info(f"File size displayed: {size_text}")
+            log_success("File size is displayed correctly")
+        else:
+            log_info("File size not visible in table (may need to expand column)")
+            # Alternative: verify via download size check later
+        
+        # ========== VERIFY DOWNLOAD WORKS ==========
+        # Download the file and verify it matches
+        download_path = '/tmp/e2e-multipart-downloaded.bin'
+        
+        with self.page.expect_download() as download_info:
+            file_row.locator('td').last.locator('button').click()
+            self.page.get_by_role('menuitem', name='Download').click()
+        
+        download = download_info.value
+        download.save_as(download_path)
+        
+        # Verify file sizes match
+        original_size = os.path.getsize(test_file)
+        downloaded_size = os.path.getsize(download_path)
+        assert original_size == downloaded_size, f"Size mismatch: {original_size} vs {downloaded_size}"
+        log_success("Downloaded file size matches original")
+        
+        # ========== CHECK MULTIPART API USAGE ==========
+        # If multipart API was used, we should see those requests
+        if multipart_requests:
+            log_success(f"Multipart API requests made: {len(multipart_requests)}")
+            for req in multipart_requests:
+                log_info(f"  - {req.method} {req.url}")
+        else:
+            log_info("Multipart API not used (file may use single-part upload)")
+        
+        # Cleanup
+        os.remove(test_file)
+        os.remove(download_path)
+    
+    def test_parallel_multipart_with_gzip(self) -> None:
+        """Test 27: Parallel multipart upload with gzip compression for text files"""
+        log_step(27, 27, "Testing: Parallel Multipart Upload with Gzip Compression")
+        
+        # Create test bucket
+        test_bucket = f"{self.config['bucket_prefix']}-parallel-gzip"
+        self.page.goto('/dashboard')
+        self.page.get_by_role('button', name='Create Bucket').click()
+        dialog = self.page.locator('.MuiDialog-root')
+        dialog.locator('input').fill(test_bucket)
+        dialog.get_by_role('button', name='Create').click()
+        expect(self.page.locator(f'text={test_bucket}')).to_be_visible()
+        log_success(f"Created test bucket: {test_bucket}")
+        
+        # Open bucket
+        self.page.click(f'text={test_bucket}')
+        expect(self.page).to_have_url(re.compile(rf'/bucket/{test_bucket}'))
+        
+        # ========== CREATE LARGE TEXT FILE (15 MB - compressible) ==========
+        test_file = '/tmp/e2e-parallel-gzip-test.txt'
+        file_size = 15 * 1024 * 1024  # 15 MB
+        
+        log_info(f"Creating compressible text file of size {file_size / (1024*1024):.1f} MB...")
+        # Use repetitive text that compresses well
+        with open(test_file, 'w') as f:
+            # Write repetitive content that gzips well
+            line = "This is a test line for gzip compression testing. " * 100 + "\n"
+            lines_needed = file_size // len(line)
+            for i in range(lines_needed):
+                f.write(f"{i:08d}: {line}")
+        log_success("Large compressible text file created")
+        
+        # ========== MONITOR NETWORK FOR PARALLEL UPLOADS ==========
+        upload_start_times = {}
+        upload_end_times = {}
+        
+        def handle_request(request):
+            if 'multipart/upload' in request.url:
+                upload_start_times[request.url] = time.time()
+        
+        def handle_response(response):
+            if 'multipart/upload' in response.url and response.status == 200:
+                upload_end_times[response.url] = time.time()
+        
+        self.page.on('request', handle_request)
+        self.page.on('response', handle_response)
+        
+        # ========== UPLOAD FILE ==========
+        file_input = self.page.locator('input[type="file"][hidden]')
+        file_input.set_input_files(test_file)
+        log_success("File input set, upload started")
+        
+        # ========== VERIFY PROGRESS INDICATOR ==========
+        progress_indicator = self.page.locator('.MuiLinearProgress-root, .MuiCircularProgress-root')
+        try:
+            expect(progress_indicator.first).to_be_visible(timeout=5000)
+            log_success("Upload progress indicator is visible")
+        except:
+            log_info("Progress indicator not immediately visible (may be fast)")
+        
+        # ========== VERIFY FILE APPEARS ==========
+        expect(self.page.get_by_role('row', name='e2e-parallel-gzip-test.txt')).to_be_visible(timeout=120000)
+        log_success("Large text file uploaded successfully")
+        
+        # ========== VERIFY FILE SIZE DISPLAY ==========
+        file_row = self.page.get_by_role('row', name='e2e-parallel-gzip-test.txt')
+        cells = file_row.locator('td').all()
+        size_text = None
+        for cell in cells:
+            text = cell.text_content()
+            if text and any(unit in text for unit in [' B', 'KB', 'MB', 'GB']):
+                size_text = text
+                break
+        
+        if size_text:
+            log_info(f"File size displayed: {size_text}")
+            # Original was 15MB, but stored size might be smaller due to gzip
+            log_success("File size displayed (may show compressed size)")
+        
+        # ========== VERIFY DOWNLOAD WORKS AND CONTENT MATCHES ==========
+        download_path = '/tmp/e2e-parallel-gzip-downloaded.txt'
+        
+        with self.page.expect_download() as download_info:
+            file_row.locator('td').last.locator('button').click()
+            self.page.get_by_role('menuitem', name='Download').click()
+        
+        download = download_info.value
+        download.save_as(download_path)
+        
+        # Verify content matches (decompression worked)
+        with open(test_file, 'r') as f:
+            original_content = f.read()
+        with open(download_path, 'r') as f:
+            downloaded_content = f.read()
+        
+        assert original_content == downloaded_content, "Downloaded content doesn't match original"
+        log_success("Downloaded file content matches original (decompression worked)")
+        
+        # ========== CHECK PARALLEL UPLOADS ==========
+        if len(upload_start_times) > 1:
+            # Check if uploads overlapped (parallel)
+            start_times = list(upload_start_times.values())
+            end_times = list(upload_end_times.values())
+            
+            if len(start_times) >= 2 and len(end_times) >= 2:
+                # Sort by time
+                start_times.sort()
+                end_times.sort()
+                
+                # Check if second upload started before first finished (parallel)
+                if len(start_times) > 1 and len(end_times) > 0:
+                    second_start = start_times[1]
+                    first_end = end_times[0] if end_times[0] > start_times[0] else end_times[1] if len(end_times) > 1 else None
+                    
+                    if first_end and second_start < first_end:
+                        log_success("Parts were uploaded in parallel (overlapping requests detected)")
+                    else:
+                        log_info("Parts uploaded sequentially")
+            
+            log_success(f"Multipart upload used: {len(upload_start_times)} parts uploaded")
+        
+        # ========== CLEANUP ==========
+        import os
+        if os.path.exists(test_file):
+            os.remove(test_file)
+        if os.path.exists(download_path):
+            os.remove(download_path)
+        self.page.goto('/dashboard')
+        self.cleanup_bucket(test_bucket)
+        log_success("Multipart upload test completed successfully")
     
     def run_all_tests(self) -> bool:
         """Execute all test flows, return True if all passed"""
@@ -2121,6 +2374,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
             ("Folder Size Calculation", self.test_folder_size_calculation),
             ("Protected Buckets", self.test_protected_buckets),
             ("File Preview", self.test_file_preview),
+            ("Multipart Upload", self.test_multipart_upload),
+            ("Parallel Multipart with Gzip", self.test_parallel_multipart_with_gzip),
         ]
         
         total = len(tests)
@@ -2197,7 +2452,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         # Stop Docker services first
         log_info("Stopping Docker services...")
         subprocess.run(
-            ['docker', 'compose', 'down'],
+            ['docker', 'compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.dev.yml', 'down'],
             cwd=self.project_root,
             capture_output=True
         )

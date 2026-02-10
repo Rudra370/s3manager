@@ -420,6 +420,115 @@ class S3Manager:
             unit_index += 1
         
         return f'{size:.2f} {units[unit_index]}'
+    
+    # ========== Multipart Upload Methods ==========
+    
+    def initiate_multipart_upload(self, bucket_name: str, key: str) -> Tuple[str, Optional[str]]:
+        """
+        Initiate a multipart upload session.
+        
+        Returns:
+            Tuple of (upload_id, error)
+        """
+        try:
+            client = self._get_client()
+            response = client.create_multipart_upload(Bucket=bucket_name, Key=key)
+            return response['UploadId'], None
+        except (ClientError, NoCredentialsError, EndpointConnectionError) as e:
+            return None, str(e)
+    
+    def upload_part(
+        self,
+        bucket_name: str,
+        key: str,
+        upload_id: str,
+        part_number: int,
+        body
+    ) -> Tuple[str, Optional[str]]:
+        """
+        Upload a single part of a multipart upload.
+        
+        Args:
+            bucket_name: The bucket name
+            key: The object key
+            upload_id: The multipart upload ID from initiate_multipart_upload
+            part_number: Part number (1-10000)
+            body: File-like object containing the part data
+        
+        Returns:
+            Tuple of (etag, error)
+        """
+        try:
+            client = self._get_client()
+            response = client.upload_part(
+                Bucket=bucket_name,
+                Key=key,
+                UploadId=upload_id,
+                PartNumber=part_number,
+                Body=body
+            )
+            return response['ETag'], None
+        except (ClientError, NoCredentialsError, EndpointConnectionError) as e:
+            return None, str(e)
+    
+    def complete_multipart_upload(
+        self,
+        bucket_name: str,
+        key: str,
+        upload_id: str,
+        parts: List[Dict[str, Any]]
+    ) -> Tuple[Dict, Optional[str]]:
+        """
+        Complete a multipart upload.
+        
+        Args:
+            bucket_name: The bucket name
+            key: The object key
+            upload_id: The multipart upload ID
+            parts: List of dicts with 'PartNumber' and 'ETag' keys
+        
+        Returns:
+            Tuple of (result_dict, error)
+        """
+        try:
+            client = self._get_client()
+            response = client.complete_multipart_upload(
+                Bucket=bucket_name,
+                Key=key,
+                UploadId=upload_id,
+                MultipartUpload={'Parts': parts}
+            )
+            return {
+                'Location': response.get('Location', ''),
+                'Bucket': response.get('Bucket', ''),
+                'Key': response.get('Key', ''),
+                'ETag': response.get('ETag', '')
+            }, None
+        except (ClientError, NoCredentialsError, EndpointConnectionError) as e:
+            return None, str(e)
+    
+    def abort_multipart_upload(
+        self,
+        bucket_name: str,
+        key: str,
+        upload_id: str
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Abort a multipart upload and delete all uploaded parts.
+        
+        Returns:
+            Tuple of (success, error)
+        """
+        try:
+            client = self._get_client()
+            client.abort_multipart_upload(
+                Bucket=bucket_name,
+                Key=key,
+                UploadId=upload_id
+            )
+            return True, None
+        except (ClientError, NoCredentialsError, EndpointConnectionError) as e:
+            return False, str(e)
 
 
 # ============================================================================

@@ -59,7 +59,7 @@ dev-build: ## Build and start services (fresh build)
 .PHONY: stop
 stop: ## Stop all services
 	@echo "$(BLUE)Stopping services...$(NC)"
-	$(DOCKER_COMPOSE) down
+	$(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml down
 	@echo "$(GREEN)✓ Services stopped$(NC)"
 
 .PHONY: restart
