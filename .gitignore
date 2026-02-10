@@ -82,3 +82,6 @@ e2e/test*
 
 # Quick setup files
 .config.quick
+
+# TODO tracker (personal)
+TODO.md

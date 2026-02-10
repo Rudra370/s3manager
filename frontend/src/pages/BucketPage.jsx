@@ -54,6 +54,8 @@ import {
 
 import { objectApi, bucketApi } from '../services/api';
 import api from '../services/api';
+import multipartApi from '../services/multipartApi';
+import { useUploadPreferences } from '../contexts/UploadPreferencesContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useStorageConfig } from '../contexts/StorageConfigContext';
@@ -72,6 +74,7 @@ const BucketPage = () => {
   const { showSnackbar } = useSnackbar();
   const { user } = useAuth();
   const { currentStorageConfig } = useStorageConfig();
+  const { getBytes, preferences } = useUploadPreferences();
 
   // Parse prefix from URL
   const getPrefixFromUrl = () => {
@@ -212,12 +215,80 @@ const BucketPage = () => {
     setUploading(true);
     setUploadProgress(0);
 
+    // Get threshold from preferences (converted to bytes)
+    const MULTIPART_THRESHOLD = getBytes('multipartThresholdMb');
+    const CHUNK_SIZE = getBytes('chunkSizeMb');
+    const PARALLEL_CHUNKS = preferences.parallelChunks;
+
+    // Helper to format duration
+    const formatDuration = (ms) => {
+      if (ms < 1000) return `${ms}ms`;
+      const seconds = ms / 1000;
+      if (seconds < 60) return `${seconds.toFixed(1)}s`;
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = (seconds % 60).toFixed(0);
+      return `${minutes}m ${remainingSeconds}s`;
+    };
+
     try {
       for (let i = 0; i < files.length; i++) {
-        await objectApi.upload(bucketName, files[i], prefix, currentStorageConfig?.id);
+        const file = files[i];
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        
+        // Check if file is large enough to need multipart upload
+        if (file.size > MULTIPART_THRESHOLD) {
+          // Inform user about multipart upload with file details
+          const thresholdMB = preferences.multipartThresholdMb;
+          showSnackbar(
+            `Large file detected: ${file.name} (${fileSizeMB} MB). Using multipart upload (${preferences.parallelChunks} parallel chunks)`,
+            'info'
+          );
+          
+          // Track upload start time
+          const uploadStartTime = Date.now();
+          
+          await multipartApi.uploadFileMultipart(
+            bucketName,
+            file,
+            prefix,
+            currentStorageConfig?.id,
+            {
+              chunkSize: CHUNK_SIZE,
+              maxConcurrent: PARALLEL_CHUNKS,
+              gzipEnabled: preferences.gzipCompression,
+              onProgress: (progress, partNumber, totalParts) => {
+                // Calculate overall progress for all files
+                const fileProgress = progress / 100;
+                const overallProgress = ((i + fileProgress) / files.length) * 100;
+                setUploadProgress(overallProgress);
+              }
+            }
+          );
+          
+          // Calculate and show duration
+          const uploadDuration = Date.now() - uploadStartTime;
+          const durationStr = formatDuration(uploadDuration);
+          const speedMBps = (file.size / (1024 * 1024) / (uploadDuration / 1000)).toFixed(1);
+          
+          showSnackbar(
+            `${file.name} uploaded in ${durationStr} (${speedMBps} MB/s)`,
+            'success'
+          );
+        } else {
+          // Use simple upload for smaller files
+          await objectApi.upload(bucketName, file, prefix, currentStorageConfig?.id);
+        }
+        
         setUploadProgress(((i + 1) / files.length) * 100);
       }
-      showSnackbar('Files uploaded successfully', 'success');
+      
+      // Show general success if multiple files or small files
+      if (files.length > 1) {
+        showSnackbar(`${files.length} files uploaded successfully`, 'success');
+      } else if (files[0].size <= MULTIPART_THRESHOLD) {
+        showSnackbar(`${files[0].name} uploaded successfully`, 'success');
+      }
+      
       loadObjects();
     } catch (error) {
       showSnackbar(getErrorMessage(error, 'Upload failed'), 'error');
@@ -509,9 +580,17 @@ const BucketPage = () => {
       {uploading && (
         <Box mb={2}>
           <Typography variant="body2" color="text.secondary">
-            Uploading... {Math.round(uploadProgress)}%
+            {uploadProgress < 100 ? `Uploading... ${Math.round(uploadProgress)}%` : 'Finalizing...'}
           </Typography>
-          <LinearProgress variant="determinate" value={uploadProgress} />
+          <LinearProgress 
+            variant="determinate" 
+            value={uploadProgress} 
+            sx={{
+              '& .MuiLinearProgress-bar': {
+                transition: 'transform 0.3s ease-in-out'
+              }
+            }}
+          />
         </Box>
       )}
 

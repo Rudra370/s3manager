@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import UploadPreferencesModal from './UploadPreferencesModal';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -24,6 +25,7 @@ import {
   Link as LinkIcon,
   Storage as StorageIcon,
   Settings as SettingsIcon,
+  Speed as SpeedIcon,
 } from '@mui/icons-material';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +43,7 @@ const Layout = () => {
   const avatarButtonRef = useRef(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [storageAnchorEl, setStorageAnchorEl] = useState(null);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -289,6 +292,16 @@ const Layout = () => {
             </MenuItem>
             <MenuItem
               onClick={() => {
+                setAnchorEl(null);
+                setPreferencesOpen(true);
+              }}
+              sx={{ borderRadius: 0 }}
+            >
+              <SpeedIcon sx={{ mr: 1.5, fontSize: 20 }} />
+              Upload Preferences
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
                 toggleTheme();
                 setAnchorEl(null);
               }}
@@ -319,6 +332,12 @@ const Layout = () => {
               Sign out
             </MenuItem>
           </Menu>
+          
+          {/* Upload Preferences Modal */}
+          <UploadPreferencesModal
+            open={preferencesOpen}
+            onClose={() => setPreferencesOpen(false)}
+          />
         </Toolbar>
       </AppBar>
       <Box
