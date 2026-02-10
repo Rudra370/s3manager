@@ -1140,14 +1140,14 @@ LOGO_URL={self.config['app']['logo_url']}"""
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
         
-        # Wait for upload and verify success
-        expect(self.page.locator('text=e2e-test-file.txt')).to_be_visible(timeout=10000)
+        # Wait for upload and verify success (use row locator to avoid matching snackbar)
+        expect(self.page.get_by_role('row', name='e2e-test-file.txt')).to_be_visible(timeout=10000)
         log_success("File uploaded successfully")
         
         # ========== TEST SEARCH ==========
         self.page.get_by_placeholder('Search files...').fill('e2e-test')
         self.page.wait_for_timeout(500)
-        expect(self.page.locator('text=e2e-test-file.txt')).to_be_visible()
+        expect(self.page.get_by_role('row', name='e2e-test-file.txt')).to_be_visible()
         log_success("Object search works")
         
         # Clear search
