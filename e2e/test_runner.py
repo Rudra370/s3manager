@@ -1274,7 +1274,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-size-test.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-size-test.txt')).to_be_visible(timeout=10000)
         
         # Go back to dashboard and calculate size
         self.page.goto('/dashboard')
@@ -1326,7 +1326,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # Wait for all files to appear
         for i in range(3):
-            expect(self.page.locator(f'text=e2e-bulk-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-bulk-{i}.txt')).to_be_visible(timeout=10000)
         log_success("3 files uploaded")
         
         # Select all files using checkboxes
@@ -1380,7 +1380,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-share-test.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-share-test.txt')).to_be_visible(timeout=10000)
         log_success("File uploaded for sharing")
         
         # ========== CREATE SHARE LINK ==========
@@ -1425,7 +1425,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # ========== VERIFY SHARE IN SHARES PAGE ==========
         self.page.goto('/shares')
-        expect(self.page.locator('text=e2e-share-test.txt')).to_be_visible()
+        expect(self.page.get_by_role('row', name='e2e-share-test.txt')).to_be_visible()
         log_success("Share appears in shares list")
         
         # ========== REVOKE SHARE ==========
@@ -1437,7 +1437,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         self.page.get_by_role('button', name='Revoke').click()
         
         # Verify share is gone
-        expect(self.page.locator('text=e2e-share-test.txt')).not_to_be_visible()
+        expect(self.page.get_by_role('row', name='e2e-share-test.txt')).not_to_be_visible()
         log_success("Share link revoked")
         
         # Cleanup
@@ -1568,7 +1568,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # Wait for uploads
         for i in range(20):
-            expect(self.page.locator(f'text=e2e-bg-delete-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-bg-delete-{i}.txt')).to_be_visible(timeout=10000)
         log_success("Uploaded 20 files to bucket")
         
         # Go back to dashboard
@@ -1635,7 +1635,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
             file_input.set_input_files(filepath)
         
         for i in range(10):
-            expect(self.page.locator(f'text=e2e-bg-bulk-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-bg-bulk-{i}.txt')).to_be_visible(timeout=10000)
         log_success("Uploaded 10 files for bulk delete test")
         
         # Select all files using checkboxes
@@ -1697,7 +1697,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
             file_input.set_input_files(filepath)
         
         for i in range(10):
-            expect(self.page.locator(f'text=e2e-inline-size-{i}.txt')).to_be_visible(timeout=10000)
+            expect(self.page.get_by_role('row', name=f'e2e-inline-size-{i}.txt')).to_be_visible(timeout=10000)
         
         # Go back to dashboard
         self.page.goto('/dashboard')
@@ -1760,7 +1760,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-public-share.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-public-share.txt')).to_be_visible(timeout=10000)
         log_success("File uploaded for public share")
         
         # Create share link (no password)
@@ -1789,8 +1789,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
         # Navigate to share link
         self.page.goto(share_link)
         
-        # Verify share page loads without login
-        expect(self.page.locator('text=e2e-public-share.txt')).to_be_visible(timeout=10000)
+        # Verify share page loads without login (use text in paper/card, not row)
+        expect(self.page.get_by_text('e2e-public-share.txt', exact=True)).to_be_visible(timeout=10000)
         expect(self.page.locator('button:has-text("Download")')).to_be_visible()
         log_success("Public share page accessible without authentication")
         
@@ -1841,7 +1841,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-pwd-share.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-pwd-share.txt')).to_be_visible(timeout=10000)
         
         # Create password-protected share
         file_row = self.page.get_by_role('row', name='e2e-pwd-share.txt')
@@ -1888,8 +1888,8 @@ LOGO_URL={self.config['app']['logo_url']}"""
         self.page.locator('input[type="password"]').fill('testpass123')
         self.page.click('button:has-text("Access File")')
         
-        # Verify access granted
-        expect(self.page.locator('text=e2e-pwd-share.txt')).to_be_visible(timeout=10000)
+        # Verify access granted (use text in paper/card, not row)
+        expect(self.page.get_by_text('e2e-pwd-share.txt', exact=True)).to_be_visible(timeout=10000)
         expect(self.page.locator('button:has-text("Download")')).to_be_visible()
         log_success("Correct password grants access")
         
@@ -2070,7 +2070,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         file_input = self.page.locator('input[type="file"][hidden]')
         file_input.set_input_files(test_file)
-        expect(self.page.locator('text=e2e-preview.txt')).to_be_visible(timeout=10000)
+        expect(self.page.get_by_role('row', name='e2e-preview.txt')).to_be_visible(timeout=10000)
         
         # Click on filename to preview
         self.page.get_by_role('row', name='e2e-preview.txt').get_by_text('e2e-preview.txt').click()
@@ -2162,7 +2162,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
         
         # ========== VERIFY FILE APPEARS AFTER UPLOAD ==========
         # Wait for upload to complete (file appears in list)
-        expect(self.page.locator('text=e2e-multipart-test.bin')).to_be_visible(timeout=60000)
+        expect(self.page.get_by_role('row', name='e2e-multipart-test.bin')).to_be_visible(timeout=60000)
         log_success("Large file uploaded successfully and appears in list")
         
         # ========== VERIFY FILE SIZE ==========
@@ -2275,7 +2275,7 @@ LOGO_URL={self.config['app']['logo_url']}"""
             log_info("Progress indicator not immediately visible (may be fast)")
         
         # ========== VERIFY FILE APPEARS ==========
-        expect(self.page.locator('text=e2e-parallel-gzip-test.txt')).to_be_visible(timeout=120000)
+        expect(self.page.get_by_role('row', name='e2e-parallel-gzip-test.txt')).to_be_visible(timeout=120000)
         log_success("Large text file uploaded successfully")
         
         # ========== VERIFY FILE SIZE DISPLAY ==========
@@ -2335,13 +2335,12 @@ LOGO_URL={self.config['app']['logo_url']}"""
             
             log_success(f"Multipart upload used: {len(upload_start_times)} parts uploaded")
         
-        # Cleanup
-        os.remove(test_file)
-        os.remove(download_path)
-        
         # ========== CLEANUP ==========
-        os.remove(test_file)
-        os.remove(download_path)
+        import os
+        if os.path.exists(test_file):
+            os.remove(test_file)
+        if os.path.exists(download_path):
+            os.remove(download_path)
         self.page.goto('/dashboard')
         self.cleanup_bucket(test_bucket)
         log_success("Multipart upload test completed successfully")
