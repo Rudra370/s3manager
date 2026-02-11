@@ -57,6 +57,9 @@ https://github.com/user-attachments/assets/d6869075-2456-4e32-981b-df77ef6e345d
 | **File Management** | Upload, organize, and manage files with a familiar folder interface |
 | **Multi-User** | Share access with your team |
 | **Multi-Storage** | Connect multiple S3-compatible storage accounts |
+| **Cross-Bucket Operations** | Copy and move files between buckets (same or different storage accounts) |
+| **Bulk Actions** | Select multiple files for copy, move, or delete operations |
+| **Background Tasks** | Large operations run asynchronously with progress tracking |
 | **Shared Links** | Create shareable links for files (with/without password) |
 | **Branding** | Customize with your logo and brand name |
 | **Quick Uploads** | Upload single or multiple files in seconds |
@@ -70,11 +73,33 @@ https://github.com/user-attachments/assets/d6869075-2456-4e32-981b-df77ef6e345d
 
 ---
 
+## Key Capabilities
+
+### Cross-Bucket Copy & Move
+Copy or move files between any buckets — even across different storage providers:
+- **Server-side copy** for same-storage transfers (fast, direct S3-to-S3)
+- **Streaming proxy** for cross-storage transfers (reliable, memory-efficient)
+- **Multipart support** for large files (>100MB)
+- **Bulk operations** — select multiple files and copy/move in one action
+- **Background processing** — progress tracking via Celery workers
+
+### Upload Performance
+- **Parallel multipart upload** — upload chunks concurrently (up to 10 parallel)
+- **Gzip compression** — automatically compress text files (70-90% size reduction)
+- **Configurable preferences** — customize threshold, chunk size, and parallelism
+
+### Permission Management
+- **Storage-level permissions** — grant read/write access per storage account
+- **Bucket-level permissions** — fine-grained access control per bucket
+- **Protected buckets** — restrict deletion of critical buckets
+
+---
+
 ## Comparison with Other Tools
 
 | Tool / Project | Self-hostable | Multi-provider (S3, R2, Wasabi, B2, MinIO...) | Teams / Role-based Permissions | Multi-user auth (login) | Shareable links (expiring/password) | Folder / Prefix size & indexing | Presigned URL support (for uploads/downloads) | Bulk/recursive delete | UI polish / UX | One-command demo / docker-compose | License |
 |---|---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **Rudra370/s3manager** | ✅ Fully (Docker / compose / setup script) | ✅ Connect multiple S3-compatible accounts | ✅ Built-in teams & permissions (first-class) | ✅ Yes — app login, JWT | ✅ Yes — share links with/without password | ✅ Size insights & background indexing (implemented) | ✅ Yes (backend issues presigned flows) | ✅ Yes — recursive delete & bulk ops (worker) | ⭐⭐⭐⭐⭐ Modern React UI, MUI, dark mode, polished | ✅ `./setup.sh` + `docker-compose.yml` included | MIT |
+| **Rudra370/s3manager** | ✅ Fully (Docker / compose / setup script) | ✅ Connect multiple S3-compatible accounts | ✅ Built-in teams & permissions (first-class) | ✅ Yes — app login, JWT | ✅ Yes — share links with/without password | ✅ Size insights & background indexing (implemented) | ✅ Yes (backend issues presigned flows) | ✅ Yes — recursive delete & bulk ops + **cross-bucket copy/move** (worker) | ⭐⭐⭐⭐⭐ Modern React UI, MUI, dark mode, polished | ✅ `./setup.sh` + `docker-compose.yml` included | MIT |
 | **MinIO Console (MinIO)** | ✅ Self-hosted (embedded in MinIO server / container) | ✅ Primarily MinIO but can target S3 endpoints (Console mostly for MinIO) | ✅ Console supports admin/IAM for MinIO clusters | ✅ Yes (MinIO users / console auth) | ⚠️ Limited for external S3 targets (console primarily admin) | ⚠️ Exposes storage metrics for MinIO; not for arbitrary external prefixes | ✅ Supports presigned URLs for objects (MinIO/S3 API) | ✅ Yes (MinIO admin features) | ⭐⭐⭐⭐ Enterprise-grade admin UX | ✅ MinIO Docker / k8s manifests | Apache-2.0 (MinIO OSS) / Commercial for AIStor |
 | **cloudlena/s3manager** | ✅ Docker image / simple to run | ✅ Works with any S3-compatible endpoint | ❌ No teams built-in (single-account UI) | ❌ Minimal/no multi-user auth by default | ❌ Not native (no share links) | ❌ No size indexing (lists objects) | ✅ Uses S3 API (so presigned possible via env) | ✅ Delete single objects; recursive deletes require config | ⭐⭐ Basic, functional UI (Go, Material) | ✅ `docker run` / example `docker-compose.yml` | MIT |
 | **Rclone Web UI (rclone-webui-react / rclone GUI)** | ✅ Self-hostable (run `rcd` + web UI) | ✅ Very wide backend support (S3, R2, B2, many more) | ❌ Not a teams/roles manager out of the box | ✅ Can be secured (rc auth / reverse proxy) | ❌ Not first-class (focus is file operations) | ❌ No built-in indexed folder sizes (can list & sum) | ✅ Presigned / direct API via rclone operations | ✅ Bulk operations supported via rclone commands | ⭐⭐⭐ Power-user oriented (two-panel file manager) | ✅ `rclone rcd --rc-web-gui` / docker images | MIT |
@@ -124,6 +149,7 @@ cp .env.example .env
 | `PORT` | 3012 | Port to run the app |
 | `SECRET_KEY` | auto-generated | JWT signing key |
 | `DATABASE_URL` | postgresql://s3manager:s3manager@postgres:5432/s3manager | PostgreSQL connection URL |
+| `MINIO_PORT` | 3014 | MinIO port for E2E testing (changed from 9000 to avoid conflicts) |
 
 ---
 
@@ -149,6 +175,18 @@ python3 test_runner.py
 
 > **Note:** E2E tests automatically create and drop a dedicated test database for each test run.
 > Make sure the PostgreSQL container is accessible from your host machine (port 5432).
+
+> **MinIO Port:** Tests use MinIO on port **3014** by default (configurable via `MINIO_PORT` 
+> environment variable). This avoids conflicts with other services that may use port 9000.
+
+**Test Coverage (34 E2E tests):**
+- Cross-bucket copy/move (same and cross-storage)
+- Bulk operations (copy, move, delete)
+- Multipart uploads with parallel chunks
+- Storage configuration management
+- Permission matrices and access control
+- Share links (public and password-protected)
+- Background task processing
 
 See [e2e/README.md](e2e/README.md) for detailed test configuration.
 

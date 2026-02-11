@@ -50,9 +50,12 @@ import {
   ArrowUpward as ArrowUpIcon,
   Calculate as CalculateIcon,
   Share as ShareIcon,
+  DriveFileMove as MoveIcon,
+  FileCopy as CopyIcon,
+  MoreHoriz as MoreActionsIcon,
 } from '@mui/icons-material';
 
-import { objectApi, bucketApi } from '../services/api';
+import { objectApi, bucketApi, storageConfigsApi } from '../services/api';
 import api from '../services/api';
 import multipartApi from '../services/multipartApi';
 import { useUploadPreferences } from '../contexts/UploadPreferencesContext';
@@ -106,10 +109,26 @@ const BucketPage = () => {
   const [itemSizes, setItemSizes] = useState({});
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareItem, setShareItem] = useState(null);
+  
+  // Copy/Move dialog states
+  const [copyMoveOpen, setCopyMoveOpen] = useState(false);
+  const [copyMoveItem, setCopyMoveItem] = useState(null);
+  const [copyMoveOperation, setCopyMoveOperation] = useState('copy'); // 'copy' or 'move'
+  const [storageConfigs, setStorageConfigs] = useState([]);
+  const [selectedStorageConfig, setSelectedStorageConfig] = useState('');
+  const [buckets, setBuckets] = useState([]);
+  const [selectedDestBucket, setSelectedDestBucket] = useState('');
+  const [copyMoveLoading, setCopyMoveLoading] = useState(false);
+  const [destPrefix, setDestPrefix] = useState('');
+  const [bucketsLoading, setBucketsLoading] = useState(false);
+  const [storageConfigsLoading, setStorageConfigsLoading] = useState(false);
 
   // Menu state
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [menuItem, setMenuItem] = useState(null);
+  
+  // Bulk actions menu state
+  const [bulkMenuAnchor, setBulkMenuAnchor] = useState(null);
 
   // Task context for bulk delete
   const { startPolling } = useTaskContext();
@@ -411,6 +430,175 @@ const BucketPage = () => {
     showSnackbar('URL copied to clipboard', 'success');
   };
 
+  const openCopyMoveDialog = async (item, operation) => {
+    setCopyMoveItem(item);
+    setCopyMoveOperation(operation);
+    setCopyMoveOpen(true);
+    setSelectedStorageConfig('');
+    setSelectedDestBucket('');
+    setDestPrefix('');
+    setStorageConfigs([]);
+    setBuckets([]);
+    setStorageConfigsLoading(true);
+    
+    // Load all storage configs
+    try {
+      const response = await storageConfigsApi.list();
+      setStorageConfigs(response.data.configs);
+    } catch (error) {
+      showSnackbar(getErrorMessage(error, 'Failed to load storage configs'), 'error');
+    } finally {
+      setStorageConfigsLoading(false);
+    }
+  };
+  
+  const openBulkCopyMoveDialog = async (operation) => {
+    setCopyMoveItem(null); // null indicates bulk operation
+    setCopyMoveOperation(operation);
+    setCopyMoveOpen(true);
+    setSelectedStorageConfig('');
+    setSelectedDestBucket('');
+    setDestPrefix('');
+    setStorageConfigs([]);
+    setBuckets([]);
+    setStorageConfigsLoading(true);
+    
+    // Close bulk menu
+    setBulkMenuAnchor(null);
+    
+    // Load all storage configs
+    try {
+      const response = await storageConfigsApi.list();
+      setStorageConfigs(response.data.configs);
+    } catch (error) {
+      showSnackbar(getErrorMessage(error, 'Failed to load storage configs'), 'error');
+    } finally {
+      setStorageConfigsLoading(false);
+    }
+  };
+  
+  const handleStorageConfigChange = async (storageConfigId) => {
+    setSelectedStorageConfig(storageConfigId);
+    setSelectedDestBucket('');
+    setBuckets([]);
+    setBucketsLoading(true);
+    
+    if (!storageConfigId) {
+      setBucketsLoading(false);
+      return;
+    }
+    
+    // Load buckets for selected storage config
+    try {
+      const response = await storageConfigsApi.listBuckets(storageConfigId);
+      // Filter out current bucket if same storage
+      const isSameStorage = storageConfigId === currentStorageConfig?.id;
+      const availableBuckets = response.data.buckets.filter(b => 
+        !(isSameStorage && b.name === bucketName)
+      );
+      setBuckets(availableBuckets);
+    } catch (error) {
+      showSnackbar(getErrorMessage(error, 'Failed to load buckets'), 'error');
+    } finally {
+      setBucketsLoading(false);
+    }
+  };
+
+  const handleCopyMove = async () => {
+    if (!selectedStorageConfig) {
+      showSnackbar('Please select a destination storage', 'error');
+      return;
+    }
+    
+    if (!selectedDestBucket) {
+      showSnackbar('Please select a destination bucket', 'error');
+      return;
+    }
+
+    setCopyMoveLoading(true);
+    
+    try {
+      // Determine source keys
+      const sourceKeys = copyMoveItem ? [copyMoveItem.key || copyMoveItem.prefix] : selected;
+      
+      const requestBody = {
+        source_storage_config_id: currentStorageConfig?.id,
+        source_bucket: bucketName,
+        source_keys: sourceKeys,
+        dest_storage_config_id: parseInt(selectedStorageConfig),
+        dest_bucket: selectedDestBucket,
+        dest_prefix: destPrefix,
+        operation: copyMoveOperation,
+        overwrite: false
+      };
+
+      const response = await api.post(`/api/buckets/${bucketName}/copy-move`, requestBody);
+      
+      if (response.data.task_id) {
+        // Background task - start polling
+        startPolling(response.data.task_id, 'BACKGROUND',
+          (data) => {
+            // Check the actual result details
+            const result = data.result || {};
+            const failedCount = result.failed_count || 0;
+            const copiedCount = result.copied_count || 0;
+            const totalCount = failedCount + copiedCount;
+            
+            if (failedCount === 0 && copiedCount > 0) {
+              // All succeeded
+              showSnackbar(
+                `${copyMoveOperation === 'copy' ? 'Copy' : 'Move'} operation completed successfully (${copiedCount} items)`,
+                'success'
+              );
+            } else if (copiedCount === 0 && failedCount > 0) {
+              // All failed
+              const firstError = result.failed?.[0]?.error || 'Unknown error';
+              showSnackbar(
+                `${copyMoveOperation === 'copy' ? 'Copy' : 'Move'} failed: ${firstError}`,
+                'error'
+              );
+            } else if (failedCount > 0 && copiedCount > 0) {
+              // Partial success
+              showSnackbar(
+                `${copyMoveOperation === 'copy' ? 'Copy' : 'Move'} partially completed: ${copiedCount} succeeded, ${failedCount} failed`,
+                'warning'
+              );
+            } else {
+              // No items processed
+              showSnackbar(
+                `${copyMoveOperation === 'copy' ? 'Copy' : 'Move'} operation completed but no items were processed`,
+                'info'
+              );
+            }
+            setSelected([]);
+            loadObjects();
+          },
+          (error) => {
+            showSnackbar(error.message || `${copyMoveOperation} operation failed`, 'error');
+          }
+        );
+      } else {
+        // Synchronous completion
+        const count = response.data.copied_count || sourceKeys.length;
+        const itemWord = count === 1 ? 'item' : 'items';
+        const actionWord = copyMoveOperation === 'copy' ? 'copied' : 'moved';
+        showSnackbar(
+          `${count} ${itemWord} ${actionWord} successfully`,
+          'success'
+        );
+        setSelected([]);
+        loadObjects();
+      }
+      
+      setCopyMoveOpen(false);
+      setCopyMoveItem(null);
+    } catch (error) {
+      showSnackbar(getErrorMessage(error, `${copyMoveOperation} operation failed`), 'error');
+    } finally {
+      setCopyMoveLoading(false);
+    }
+  };
+
   const handleCalculateSize = async () => {
     try {
       await startSizeCalc('/api/tasks/calculate-size', {
@@ -546,17 +734,45 @@ const BucketPage = () => {
             />
           </Button>
           {selected.length > 0 && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={() => {
-                setDeleteItem({ type: 'bulk', count: selected.length });
-                setDeleteDialogOpen(true);
-              }}
-            >
-              Delete ({selected.length})
-            </Button>
+            <>
+              <Button
+                variant="outlined"
+                startIcon={<MoreActionsIcon />}
+                onClick={(e) => setBulkMenuAnchor(e.currentTarget)}
+              >
+                Actions ({selected.length})
+              </Button>
+              <Menu
+                anchorEl={bulkMenuAnchor}
+                open={Boolean(bulkMenuAnchor)}
+                onClose={() => setBulkMenuAnchor(null)}
+              >
+                <MenuItem onClick={() => openBulkCopyMoveDialog('copy')}>
+                  <ListItemIcon>
+                    <CopyIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Copy to...</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => openBulkCopyMoveDialog('move')}>
+                  <ListItemIcon>
+                    <MoveIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Move to...</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                  onClick={() => {
+                    setBulkMenuAnchor(null);
+                    setDeleteItem({ type: 'bulk', count: selected.length });
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <ListItemIcon>
+                    <DeleteIcon fontSize="small" color="error" />
+                  </ListItemIcon>
+                  <ListItemText sx={{ color: 'error.main' }}>Delete</ListItemText>
+                </MenuItem>
+              </Menu>
+            </>
           )}
         </Box>
 
@@ -798,6 +1014,28 @@ const BucketPage = () => {
         )}
         <MenuItem
           onClick={() => {
+            openCopyMoveDialog(menuItem, 'copy');
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <CopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Copy to</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            openCopyMoveDialog(menuItem, 'move');
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <MoveIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Move to</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
             setDeleteItem(menuItem);
             setDeleteDialogOpen(true);
             closeMenu();
@@ -873,6 +1111,114 @@ const BucketPage = () => {
 
       {/* Global Task Progress Snackbar (for folder and bulk deletion) */}
       <TaskSnackbar />
+
+      {/* Copy/Move Dialog */}
+      <Dialog 
+        open={copyMoveOpen} 
+        onClose={() => {
+          if (!copyMoveLoading) {
+            setCopyMoveOpen(false);
+            setCopyMoveItem(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {copyMoveOperation === 'copy' 
+            ? (copyMoveItem ? 'Copy to' : `Copy ${selected.length} items to`) 
+            : (copyMoveItem ? 'Move to' : `Move ${selected.length} items to`)}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {copyMoveItem ? (
+              <>Selected: <strong>{copyMoveItem.name}</strong></>
+            ) : (
+              <>{selected.length} items will be {copyMoveOperation === 'copy' ? 'copied' : 'moved'}</>
+            )}
+          </Typography>
+          
+          {/* Storage Config Selection */}
+          <TextField
+            select
+            label="Destination Storage"
+            fullWidth
+            margin="normal"
+            value={selectedStorageConfig}
+            onChange={(e) => handleStorageConfigChange(e.target.value)}
+            disabled={copyMoveLoading || storageConfigsLoading}
+            SelectProps={{ native: true }}
+            InputLabelProps={{ shrink: true }}
+          >
+            <option value="">-- Select a storage --</option>
+            {storageConfigs.map((config) => (
+              <option key={config.id} value={config.id}>
+                {config.name} {config.id === currentStorageConfig?.id ? '(Current)' : ''}
+              </option>
+            ))}
+          </TextField>
+          
+          {/* Bucket Selection */}
+          <TextField
+            select
+            label="Destination Bucket"
+            fullWidth
+            margin="normal"
+            value={selectedDestBucket}
+            onChange={(e) => setSelectedDestBucket(e.target.value)}
+            disabled={copyMoveLoading || bucketsLoading || !selectedStorageConfig || buckets.length === 0}
+            SelectProps={{ native: true }}
+            InputLabelProps={{ shrink: true }}
+          >
+            <option value="">
+              {bucketsLoading ? 'Loading buckets...' : 
+               !selectedStorageConfig ? 'Select a storage first' : 
+               '-- Select a bucket --'}
+            </option>
+            {buckets.map((bucket) => (
+              <option key={bucket.name} value={bucket.name}>
+                {bucket.name}
+              </option>
+            ))}
+          </TextField>
+          
+          {!bucketsLoading && selectedStorageConfig && buckets.length === 0 && (
+            <Typography color="warning.main" variant="body2">
+              No buckets available in this storage. Create a bucket first.
+            </Typography>
+          )}
+          
+          <TextField
+            label="Destination Path (optional)"
+            placeholder="e.g., folder/subfolder/"
+            fullWidth
+            margin="normal"
+            value={destPrefix}
+            onChange={(e) => setDestPrefix(e.target.value)}
+            disabled={copyMoveLoading}
+            helperText="Leave empty to copy/move to bucket root"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setCopyMoveOpen(false);
+              setCopyMoveItem(null);
+            }}
+            disabled={copyMoveLoading}
+          >
+            Close
+          </Button>
+          <Button 
+            onClick={handleCopyMove} 
+            variant="contained"
+            disabled={copyMoveLoading || !selectedDestBucket}
+            startIcon={copyMoveLoading && <CircularProgress size={16} />}
+          >
+            {copyMoveLoading ? 'Processing...' : (copyMoveOperation === 'copy' ? 'Copy' : 'Move')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

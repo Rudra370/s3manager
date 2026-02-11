@@ -116,8 +116,14 @@ export const TaskProvider = ({ children }) => {
       // Start polling
       startPolling(task_id, 'BACKGROUND', 
         (data) => {
+          // Only show generic success message if onComplete doesn't handle it
+          // and there were no failures
           if (successMessage) {
-            showSnackbar(successMessage, 'success');
+            const result = data.result || {};
+            const failedCount = result.failed_count || 0;
+            if (failedCount === 0) {
+              showSnackbar(successMessage, 'success');
+            }
           }
           if (onComplete) {
             onComplete(data);
