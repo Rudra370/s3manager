@@ -333,6 +333,53 @@ class S3Manager:
         except (ClientError, NoCredentialsError, EndpointConnectionError) as e:
             return False, str(e)
     
+    def copy_object(
+        self,
+        source_bucket: str,
+        source_key: str,
+        dest_bucket: str,
+        dest_key: str,
+        metadata: Optional[Dict] = None
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Copy an object within the same S3 account using server-side copy.
+        
+        Args:
+            source_bucket: Source bucket name
+            source_key: Source object key
+            dest_bucket: Destination bucket name
+            dest_key: Destination object key
+            metadata: Optional metadata to set on the destination object
+        
+        Returns:
+            Tuple of (success, error)
+        """
+        try:
+            client = self._get_client()
+            
+            copy_source = {
+                'Bucket': source_bucket,
+                'Key': source_key
+            }
+            
+            extra_args = {}
+            if metadata:
+                extra_args['Metadata'] = metadata
+                extra_args['MetadataDirective'] = 'REPLACE'
+            else:
+                extra_args['MetadataDirective'] = 'COPY'
+            
+            client.copy_object(
+                CopySource=copy_source,
+                Bucket=dest_bucket,
+                Key=dest_key,
+                **extra_args
+            )
+            return True, None
+            
+        except (ClientError, NoCredentialsError, EndpointConnectionError) as e:
+            return False, str(e)
+    
     def delete_objects(self, bucket_name: str, keys: List[str]) -> Tuple[List[str], Optional[str]]:
         """Delete multiple objects."""
         try:

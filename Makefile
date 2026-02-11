@@ -9,7 +9,7 @@
 PORT ?= 3012
 
 # MinIO port for testing (can be overridden: make test MINIO_PORT=9001)
-MINIO_PORT ?= 9000
+MINIO_PORT ?= 3014
 
 # Detect docker compose command (docker-compose v1 or docker compose v2)
 # GitHub Actions uses 'docker compose', local may use either

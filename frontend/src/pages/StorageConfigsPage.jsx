@@ -40,6 +40,7 @@ import { useNavigate } from 'react-router-dom';
 import { storageConfigsApi } from '../services/api';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useStorageConfig } from '../contexts/StorageConfigContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { getErrorMessage } from '../utils/error';
 
@@ -47,6 +48,7 @@ const StorageConfigsPage = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { showSnackbar } = useSnackbar();
+  const { refreshStorageConfigs, currentStorageConfig } = useStorageConfig();
 
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -204,6 +206,8 @@ const StorageConfigsPage = () => {
 
       handleCloseDialog();
       fetchConfigs();
+      // Refresh global storage config context to update navbar
+      await refreshStorageConfigs();
     } catch (error) {
       showSnackbar(getErrorMessage(error, 'Failed to save configuration'), 'error');
     } finally {
@@ -224,6 +228,18 @@ const StorageConfigsPage = () => {
   };
 
   const handleDeleteClick = (config) => {
+    // Check if trying to delete current storage config
+    if (currentStorageConfig && config.id === currentStorageConfig.id) {
+      showSnackbar('Cannot delete the storage configuration you are currently using. Please switch to another storage first.', 'error');
+      return;
+    }
+    
+    // Check if this is the last storage config
+    if (configs.length <= 1) {
+      showSnackbar('Cannot delete the last storage configuration. At least one storage config must remain.', 'error');
+      return;
+    }
+    
     setConfigToDelete(config);
     setDeleteConfirmOpen(true);
   };
@@ -235,6 +251,8 @@ const StorageConfigsPage = () => {
       await storageConfigsApi.delete(configToDelete.id);
       showSnackbar('Storage configuration deleted successfully', 'success');
       fetchConfigs();
+      // Refresh global storage config context to update navbar
+      await refreshStorageConfigs();
     } catch (error) {
       showSnackbar(getErrorMessage(error, 'Failed to delete configuration'), 'error');
     } finally {
@@ -245,13 +263,7 @@ const StorageConfigsPage = () => {
 
   const getDeleteWarningMessage = () => {
     if (!configToDelete) return '';
-    const activeCount = configs.filter(c => c.is_active).length;
-    const isLastActive = configToDelete.is_active && activeCount === 1;
-    
-    if (isLastActive) {
-      return `Are you sure you want to delete "${configToDelete.name}"? This is the last active storage configuration.`;
-    }
-    return `Are you sure you want to delete "${configToDelete.name}"?`;
+    return `Are you sure you want to delete "${configToDelete.name}"? This action cannot be undone.`;
   };
 
   if (!isAdmin) {

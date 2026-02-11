@@ -2,18 +2,20 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import unquote
 
 
 from app.database import get_db
 from app.models import User
-from app.schemas import ObjectList, BulkDeleteRequest, PrefixCreate
+from app.schemas import ObjectList, BulkDeleteRequest, PrefixCreate, CopyMoveRequest, CopyMoveResponse
 from app.auth import get_current_active_user
 from app.permissions import require_bucket_read, require_bucket_write
 from app.s3_client import get_s3_manager_from_config
 from app.utils import get_storage_config
 from app.utils.formatting import format_size
+from app.tasks.copy_tasks import copy_objects_task
+from app.tasks.progress import TaskProgressStore
 
 router = APIRouter(prefix="/api/buckets/{bucket_name}", tags=["objects"])
 logger = logging.getLogger(__name__)
@@ -468,3 +470,111 @@ def search_objects(
         "total_found": len(all_objects),
         "query": query
     }
+
+
+@router.post("/copy-move", response_model=CopyMoveResponse)
+def copy_move_objects(
+    bucket_name: str,
+    request: CopyMoveRequest,
+    storage_config_id: Optional[int] = Query(default=None, description="Storage config ID (uses default if not provided)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Copy or move objects to another bucket/storage config.
+    
+    This endpoint initiates a background task for the copy/move operation
+    and returns immediately with a task ID for progress tracking.
+    """
+    logger.info(
+        f"Copy/move initiated: user={current_user.email}, operation={request.operation}, "
+        f"source={request.source_bucket}, dest={request.dest_bucket}",
+        extra={
+            "user_id": current_user.id,
+            "operation": request.operation,
+            "source_bucket": request.source_bucket,
+            "dest_bucket": request.dest_bucket
+        }
+    )
+    
+    # Verify storage configs exist
+    source_config = get_storage_config(db, request.source_storage_config_id)
+    if not source_config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Source S3 storage not configured"
+        )
+    
+    dest_config = get_storage_config(db, request.dest_storage_config_id)
+    if not dest_config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Destination S3 storage not configured"
+        )
+    
+    # Check read permission on source bucket
+    require_bucket_read(current_user, request.source_storage_config_id, request.source_bucket, db)
+    
+    # Check write permission on destination bucket
+    require_bucket_write(current_user, request.dest_storage_config_id, request.dest_bucket, db)
+    
+    # Validate that destination bucket exists
+    dest_s3_manager = get_s3_manager_from_config(dest_config)
+    dest_buckets, error = dest_s3_manager.list_buckets()
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to verify destination bucket: {error}"
+        )
+    
+    bucket_exists = any(b['name'] == request.dest_bucket for b in dest_buckets)
+    if not bucket_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Destination bucket '{request.dest_bucket}' does not exist in the selected storage"
+        )
+    
+    # Validate operation
+    if request.operation not in ["copy", "move"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Operation must be 'copy' or 'move'"
+        )
+    
+    # Validate source keys
+    if not request.source_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No source keys provided"
+        )
+    
+    # Always use background task for copy/move to avoid HTTP timeouts
+    # Even small operations can take time due to S3 latency, listing, etc.
+    # This ensures consistent behavior and better UX with progress tracking
+    task = copy_objects_task.delay(
+        source_storage_config_id=request.source_storage_config_id,
+        source_bucket=request.source_bucket,
+        source_keys=request.source_keys,
+        dest_storage_config_id=request.dest_storage_config_id,
+        dest_bucket=request.dest_bucket,
+        dest_prefix=request.dest_prefix,
+        operation=request.operation,
+        overwrite=request.overwrite,
+        user_id=current_user.id
+    )
+    
+    logger.info(
+        f"Copy/move task started: task_id={task.id}, "
+        f"user={current_user.email}, keys={len(request.source_keys)}",
+        extra={
+            "user_id": current_user.id,
+            "task_id": task.id,
+            "operation": request.operation
+        }
+    )
+    
+    return CopyMoveResponse(
+        task_id=task.id,
+        status="pending",
+        message=f"{request.operation} operation started. Use /api/tasks/{task.id} to track progress."
+    )

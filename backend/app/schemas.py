@@ -404,3 +404,24 @@ class SizeProgress(BaseModel):
     size: int
     size_formatted: str
     status: str  # 'calculating', 'complete', 'error'
+
+
+class CopyMoveRequest(BaseModel):
+    """Request to copy or move objects between buckets/storage configs."""
+    source_storage_config_id: int
+    source_bucket: str
+    source_keys: List[str]  # Can be single file or multiple files/folders
+    dest_storage_config_id: int
+    dest_bucket: str
+    dest_prefix: str = ""   # Optional destination path prefix
+    operation: str  # "copy" or "move"
+    overwrite: bool = False  # Handle conflicts
+
+
+class CopyMoveResponse(BaseModel):
+    """Response from copy/move operation."""
+    task_id: Optional[str] = None
+    status: str  # "pending", "completed", "error"
+    message: str
+    copied: Optional[List[str]] = None
+    failed: Optional[List[Dict[str, str]]] = None
